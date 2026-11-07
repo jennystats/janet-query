@@ -3,3 +3,4 @@ scope.md
 .duckdb.log
 bundle/
 _build/
+specs/_apalache-out/

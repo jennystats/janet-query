@@ -112,7 +112,12 @@ The full example set, with captured output for every example, is in
 ## The behaviour contract
 
 `execute` returns `{:rows @[(...) ...] :columns @[:k ...]}` or raises an
-error struct. The refusal grammar:
+error struct. The full specification is in [specs/](specs/) - the
+contract text in [specs/api-contract.md](specs/api-contract.md), and the
+Quint models it is checked against. This section is the summary; the
+spec is the authority.
+
+The refusal grammar:
 
 | error | class | raised when |
 |---|---|---|
