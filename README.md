@@ -268,6 +268,13 @@ changes/fix-cr-execution-path-outcome.md.)
 - **[suresql](https://github.com/joy-framework/suresql)** - yesql-style
   named SQL files as functions. Plain SQL as the interface, no tree to
   compose or cross-check.
+- **[janet-duckdb](https://github.com/jennystats/janet-duckdb)** and
+  **[janet-rayforce](https://github.com/jennystats/janet-rayforce)** -
+  if you want a specific engine without the layer, both engines are
+  usable directly: janet-duckdb takes SQL text (parameterised) straight
+  to DuckDB, and janet-rayforce drives the engine in Rayfall, its own
+  query language. janet-query exists for the layer on top of them: one
+  inert node tree over both engines, one refusal grammar, one contract.
 
 ## Install
 
