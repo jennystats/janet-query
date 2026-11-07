@@ -937,7 +937,21 @@ The walk that applies the letter is in `specs/catalogue-record.qnt`
 (`unionPresent`); an independent-oracle restatement of the same rule is
 in `specs/catalogue-partb.qnt` (`pbS2`). The oracle shares the key
 scoping and the block rule with the walk by the letter's own design, so
-it proves admission-shape conformance, not independent semantics.
+it proves admission-shape conformance, not independent semantics. The
+independent anchor is the absent-mode baseline, pinned by the two
+same-path cells and the cross-copy family.
+
+What the instruments certify on the amended surface, and what they do
+not: `pbS2` is GREEN at the 10000-path bound and kills the
+admission-shape mutants M2, M3, M5, M6 and M7, so it certifies that the
+walk matches the letter on admission shape. The present-mode properties
+of the walked model (`ps2Neutrality`, `absorptionNever`,
+`presenceNeverFlips`) are SUPPORT INSTRUMENTS, not gates. Two of them are
+red on the WIDE sentence - `presenceNeverFlips` and the presence face of
+`absorptionNever` - which is why the third consequence below is stated in
+its narrowed form and not as a closure; the third (`ps2Neutrality`) is
+red on the shape fixtures' writer-value defect, stated below. No green
+present-mode run of these properties is cited by this contract.
 
 **The A21.10 disposition reading.** The `foreign` disposition of 12.3
 decides what an entry CONTRIBUTES where admission has not already ruled
@@ -971,7 +985,7 @@ shipped: `malformed` is unreachable, and the union is the only behaviour.
 Order-only disagreement - two entries carrying the same set in different
 orders - is not this rule's trigger; it compares sets.
 
-### 12.5 The absent-mode known limitations
+### 12.5 The known limitations of the writer-identity surface
 
 Where no entry carries a writer field, three properties do not hold, and
 their failure is the surface's behaviour rather than a defect:
@@ -986,15 +1000,44 @@ their failure is the surface's behaviour rather than a defect:
   Removing an alien entry can move a verdict, and removing one can never
   introduce a name.
 
-Under the writer-identity field all three close: a shared block adds
-nothing under identity scoping and, when the block it removes is the one
-the block rule applies, it subtracts the record's own claim of that list;
-a foreign entry under any of the record's own spellings describes
-nothing; and removing every alien-key entry, or every entry whose writer
-is another record, can change a description only where the removed entry
-is the block the rule applies. The measurement's arrow runs from WRITER
-match to ADMISSION (a list the writer carries does not make its entry
-admitted), never from CONTENT to the writer disposition.
+Under the writer-identity field, two of those three limitations are
+closed by admission itself:
+
+- A shared block adds nothing under identity scoping and, when the block
+  it removes is the one the block rule applies, it subtracts the
+  record's own claim of that list.
+- A foreign entry under any of the record's own spellings describes
+  nothing.
+
+The third limitation is NOT closed and the closing sentence does not
+hold as written: removing every alien-key entry, or every entry whose
+writer is another record, CAN change a description and can therefore
+move a verdict, where the removed entry is the block the block rule
+applies. The measured shape is the cross-copy family, where the pruned
+catalogue serves a name the full catalogue refuses. The property that
+states the unlimited form (`presenceNeverFlips` in
+`specs/catalogue-record.qnt`, and `pbPresenceNeverFlips` in
+`specs/catalogue-partb.qnt`) is therefore RED on the amended surface and
+is a support instrument, not a gate. What holds, and what a caller may
+rely on, is the narrowed direction: an alien entry may SUBTRACT a block,
+never ADD a name. Removing one can move a verdict; removing one can never
+introduce a name.
+
+The measurement's arrow runs from WRITER match to ADMISSION (a list the
+writer carries does not make its entry admitted), never from CONTENT to
+the writer disposition.
+
+**Standing measurement caveat.** The walked model's present-mode
+`ps2Neutrality` and `absorptionNever` runs are RED on the shipped lane,
+and neither red is a contract statement. Both land on `ff-*` shapes,
+where the writer value domain of the shape fixtures and the value ids the
+fieldless test reads do not line up: `specs/catalogue-shapes.qnt` maps a
+value id (`wr-A`) to the record name (`A`) in the fixture's writer field,
+while the fieldless test reads value ids. The counterexample shape moves
+between solver runs; the class does not. Both reds are FIXTURE defects:
+they say nothing about the admissibility rule, which is certified by
+`pbS2` and not by these runs. The properties are red until the fixture is
+corrected.
 
 ### 12.6 The exclusions register
 

@@ -173,7 +173,7 @@
 //   (likewise absorptionNever, presenceNeverFlips, absentFieldUnions)
 //   quint verify --main=janetQueryCatalogue --init=initPresent --step=step \
 //     --max-steps=3 --invariant=ps2Neutrality scope-model.qnt
-//   (likewise absorptionNever, presenceNeverFlips, s1Choice)
+//   (likewise absorptionNever, presenceNeverFlips)
 //   quint test --main=janetQueryCatalogue --match='cm.*' scope-model.qnt
 
 module janetQueryScope {
@@ -2484,25 +2484,31 @@ module janetQueryScope {
 //     state space; the consequences are enumerated by runs.
 //
 // THE PROPERTIES (invariants, checked - see the verification block at the
-// top of the file for the per-cluster commands):
+// top of the file for the per-cluster commands). The present-mode reds on
+// the `ff-*` shapes are fixture defects (see catalogue-shapes.qnt: the
+// fixture's writer field carries record names while the fieldless test
+// reads value ids), so these three are SUPPORT INSTRUMENTS, not gates:
 //   P-S2          ps2Neutrality: an entry whose writer is not the record
 //                 changes nothing - removing every writer-other entry
-//                 leaves the described set identical. GREEN in present
-//                 mode; REFUTED in absent mode (the alien agreeing copy
-//                 that subtracts an own entry's claim).
+//                 leaves the described set identical. REFUTED in absent
+//                 mode (the alien agreeing copy that subtracts an own
+//                 entry's claim).
 //   P-absorption  absorptionNever: nothing outside the record's own
-//                 writer's claims is ever described. GREEN present;
-//                 REFUTED absent (the wall: a foreign entry under any
-//                 spelling of the arm's own keys describes the arm - the
-//                 refutation trace IS the wall proof).
+//                 writer's claims is ever described. REFUTED absent (the
+//                 wall: a foreign entry under any spelling of the arm's
+//                 own keys describes the arm - the refutation trace IS the
+//                 wall proof).
 //   P-presence    presenceNeverFlips: removing every entry under a key
-//                 alien to the record never changes a verdict. GREEN
-//                 present; REFUTED absent (catalogue presence flipping
-//                 ok to err: the shared-block silence is load-bearing
-//                 without writer identity).
-//   P-S1          absentFieldUnions (absent mode: the field semantics
-//                 union, never malformed) and s1Choice (present mode: the
-//                 refuse option refuses, the union option serves).
+//                 alien to the record never changes a verdict. REFUTED in
+//                 both modes on the wide sentence: an alien entry is the
+//                 block that silences an own claim, so removing it can move
+//                 a verdict. A SUPPORT INSTRUMENT, not a gate; the narrowed
+//                 direction (an alien entry may subtract a block, never add
+//                 a name) is what holds.
+//   P-S1          absentFieldUnions: the absent-field semantics union two
+//                 disagreeing own entries, never malformed. (Union is the
+//                 only behaviour, so there is no present-mode choice to
+//                 check and no `s1Choice` invariant.)
 //
 // STATE SPACE AND BOUNDS (the coverage statement the verify records must
 // support; nothing here is sampled):

@@ -10,7 +10,7 @@
   (each line (string/split "\n" (string (sh-capture (string cmd " 2>&1"))))
     (when (or (string/find "PASS" line) (string/find "FAIL" line)
               (string/find "rror" line) (string/find "Timeout" line)
-              (string/find "It took" line))
+              (string/find "[ok]" line) (string/find "[violation]" line))
       (say (string/trim line)))))
 
 (def typechecks
@@ -21,7 +21,7 @@
    "quint typecheck intersection.qnt"])
 
 (def absent ["ps2Neutrality" "absorptionNever" "presenceNeverFlips" "absentFieldUnions"])
-(def present ["ps2Neutrality" "absorptionNever" "presenceNeverFlips" "s1Choice"])
+(def present ["ps2Neutrality" "absorptionNever" "presenceNeverFlips"])
 
 (each c typechecks (run c))
 (each inv absent

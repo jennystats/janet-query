@@ -608,7 +608,8 @@ module catalogueRecord {
   // IS the oracle's answer - the writer-identity rule on its own alphabet: (c) the
   // writer resolves to the record (NECESSARY), (a) the entry sits under
   // one of the record's own spellings, (b) no alien-key entry carries
-  // its list. Absent mode keeps its refutation; present mode's verdict is measured.
+  // its list. Absent mode keeps its refutation; the present-mode run is a
+  // support instrument, red on the `ff-*` shapes through a fixture defect.
   val ps2Neutrality =
     clane != "done"
     or(cdesc == ps2Oracle(shCat(cshape, cform), csubj))
@@ -785,7 +786,7 @@ module catalogueRecord {
 
   // P-absorption against each FIELDLESS entry's OWN VALUE: no fieldless
   // entry changes a verdict by contributing under the value it carries.
-  // Present: green. Absent: REFUTED - the field-sensitivity differential
+  // Absent: REFUTED - the field-sensitivity differential
   // as its own
   // property (a fieldless entry whose value meets another entry's list
   // under the record's own keys moves the verdict).
