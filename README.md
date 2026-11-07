@@ -233,25 +233,26 @@ min of five reps, same file, same machine:
 
 | query | duckdb-sql cold | jq-duckdb cold | jq-rayforce cold | duckdb-sql warm | jq-duckdb warm | jq-rayforce warm |
 |---|---|---|---|---|---|---|
-| q1 filter | 5.3 | 8.9 | 796.0 | 2.9 | 6.2 | 868.5 |
-| q2 group top N | 1.5 | 4.6 | 814.7 | 1.3 | 3.6 | 798.7 |
-| q3 join | 4.4 | 11.0 | 2021.9 | 4.0 | 8.5 | 2127.4 |
-| q4 top row per group | 3.8 | 10.9 | 2255.1 | 3.2 | 7.8 | 2167.5 |
-| q5 full scan | 2.0 | 5.3 | 841.6 | 1.8 | 4.5 | 881.8 |
+| q1 filter | 5.3 | 8.9 | 29.6 | 2.9 | 6.2 | 1.3 |
+| q2 group top N | 1.5 | 4.6 | 23.6 | 1.3 | 3.6 | 0.7 |
+| q3 join | 4.4 | 11.0 | 24.5 | 4.0 | 8.5 | 2.8 |
+| q4 top row per group | 3.8 | 10.9 | 26.4 | 3.2 | 7.8 | 3.0 |
+| q5 full scan | 2.0 | 5.3 | 12.4 | 1.8 | 4.5 | 0.9 |
 
-(ms; cold reads the file per rep, warm executes against loaded data.)
+(ms; cold reads the file per rep, warm executes against loaded data.
+Rayforce numbers after the execution-path fix - the pre-fix build paid
+a per-execute cost of 800-2300 ms; see the janet-rayforce repo,
+changes/fix-cr-execution-path-outcome.md.)
 
-- Raw SQL through janet-duckdb is the fastest route in both phases.
-- The tree layer costs its expansion and rendering on top of raw SQL:
-  1.7x to 3.0x cold, 1.8x to 4.2x warm on this workload.
-- The rayforce lane spends roughly 800 to 2300 ms per execution at this
-  scale: the parquet read is 29 ms for this file and a graph build 0.2 ms,
-  so the cost sits in the binding's per-execution query path, not in file
-  IO.
-
-The recorded tables in `bench/results/` also carry pandas, polars, dplyr
-and data.table numbers from the same comparison run; those route scripts
-are not shipped - they need toolchains beyond Janet.
+- Raw SQL through janet-duckdb and the tree layer on duckdb are the
+  fastest routes, within 1.7x to 3.0x of raw SQL in both phases.
+- The rayforce lane is now in the same band as duckdb: warm 0.7 to
+  3.0 ms (faster than duckdb on q1/q2/q5), cold 12 to 30 ms (at the
+  parquet-read floor). The full tree layer over the raw engine costs
+  1.3x to 4.5x.
+- The recorded tables in `bench/results/` also carry pandas, polars,
+  dplyr and data.table numbers from the same comparison run; those
+  route scripts are not shipped - they need toolchains beyond Janet.
 
 ## Alternatives
 
