@@ -183,6 +183,42 @@ rayforce surface additionally refuses VARCHAR beyond terminal positions
   reader on rayforce - but those queries run on one engine each, never
   on both.
 
+### Existing data
+
+Parquet files are the only file source a tree can name, but data
+already living inside an engine is reachable too - per engine:
+
+- **An existing duckdb database on disk**: the duckdb backend opens its
+  own in-memory database and runs every tree there - it never opens a
+  file directly. Attach your database through the exposed connection
+  and its tables become ordinary sources:
+
+  ```janet
+  (import jennystats/query-duckdb :as jqd)
+  (import jennystats/duckdb :as duckdb)
+  (def conn (jqd/conn))
+  (duckdb/execute conn "ATTACH 'mydata.duckdb' AS mydata")
+  (duckdb/execute conn "USE mydata")
+  # trees with (from :invoices) now execute against the attached file
+  ```
+
+  The connection is exposed as `jqd/conn`; janet-duckdb's full API
+  (open, execute, prepared statements) works on it.
+
+- **An existing rayforce table**: the rayforce from-node binds engine
+  tables directly - a table already in the engine is wrapped in a
+  source handle and borrowed, never copied:
+
+  ```janet
+  (from @{:backend :rayforce :handle my-table})
+  ```
+
+  An in-janet dataset takes the same shape with ordered
+  `[name column]` pairs instead of a handle: `@{:backend :rayforce
+  :columns @[@[:name col] ...]}`. Catalog-named tables are
+  not bindable on rayforce (no named-table registry); handles and
+  in-janet datasets are the two supported routes.
+
 ## Measured cost
 
 `bench/` ships a deterministic scale generator (65,536 rows, seed 20261107,
