@@ -21,8 +21,14 @@
    ["scope floor" "quint test --main=janetQueryScope --match='scope.*InMaterialisedModel' scope-model.qnt"]
    ["scope mutant" "quint test --main=janetQueryScope --match='MutantReadsANextState' scope-model.qnt"]
    ["catalogue pins" "quint test --main=janetQueryCatalogue --match='cmSamePathOwnersKeepDistinctKeys|cmSamePathPairRowRefusesTheSharedText' scope-model.qnt"]
-   ["catalogue lane" "quint test --main=janetQueryCatalogue --match='cm.*' scope-model.qnt"]
-   ["intersection" "quint test intersection.qnt"]])
+ # the catalogue lane is NOT a gate leg: it selects the designed-red
+   # `cmRowlessMutantVacuity` (stated in the spec header, section 5).
+   # `quint test intersection.qnt` with no selector runs NOTHING in Quint
+   # 0.33.1 (prints the module name, exits 0), so its seven runs are named.
+   ["intersection" "quint test --main=janetQueryIntersection --match=\"sharedQueryBothBackends|extensionDeniedNamed|conflictNeverExecutes|ambiguousNeverExecutes|demotionRecordsRevision|demotionUnaffectedNeedsNoRevision|duplicateRegisterRejected\" intersection.qnt"]
+   # citation closure: every name the header cites exists, and every pinned
+   # verdict the header states survives a re-run at the count it claims
+   ["citation gate" "janet citation-gate.janet"]])
 
 (each [name cmd] runs
   (let [t0 (os/clock)
