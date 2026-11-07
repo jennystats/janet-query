@@ -1,8 +1,8 @@
 # janet-query
 
 Engine-agnostic compositional query trees for Janet. A query is an inert
-Janet value; one registered backend translates it, checks it and executes
-it. Two engines are wired: [duckdb](https://duckdb.org) through
+Janet value; one of the registered backend translates it, checks it and executes
+it. Two engines are currently available: [duckdb](https://duckdb.org) through
 [janet-duckdb](https://github.com/jennystats/janet-duckdb) and
 [rayforce](https://github.com/RayforceDB/rayforce) through
 [janet-rayforce](https://github.com/jennystats/janet-rayforce).
@@ -101,7 +101,7 @@ the engine is called:
 
 ### Raw SQL or a tree
 
-For a one-off, raw SQL through janet-duckdb is the shorter route. Use the
+For a one-off query, raw SQL through janet-duckdb is the shorter route. Use the
 tree when the query should run on more than one engine, when the catalogue
 should check names before execution, or when the same query shape is
 composed and reused.
@@ -159,19 +159,29 @@ rayforce surface additionally refuses VARCHAR beyond terminal positions
 
 ### Documented limitations
 
-- The v1 node set has no window operator; duckdb serves window frames
-  through the escape hatch only. The group-and-join substitute is what the
-  benchmark's q4 runs.
+- The v1 node set has no window operator: rankings, running totals and
+  per-group row numbers cannot be expressed as a janet-query tree. Two
+  options: inject the SQL through the backend-tagged escape fragment
+  (duckdb only - the query will not run on rayforce), or restructure as
+  a group-and-join (the substitute the benchmarks' q4 uses).
 - Order keys stay outside the catalogue name check (a known gap; a
   regression cell fails if a future change starts checking them silently).
 - Group keys are name-checked at expansion.
-- A non-sequence `:columns` catalogue value (a string or keyword) iterates
-  as bytes and describes a byte list; an integer raises the raw host error.
+- A catalogue entry whose `:columns` value is not a sequence of column
+  names misbehaves: a string or keyword value iterates by byte (the
+  catalogue describes nonsense one-character columns, silently), and a
+  non-iterable value (e.g. an integer) raises janet's raw host error
+  instead of a contract refusal. Column names containing digits are
+  unaffected - the type of the value is what matters, not the names.
 - The exclusions register - union order, empty `:columns`, from-source
   arms, the two-record same-path lane, append width, writers beyond two
   records - is outside the verified model and not licensed.
-- CSV is not a source: `from-parquet` binds a parquet path, and a `.csv`
-  path fails in the parquet reader with that reader's own error.
+- CSV is not a tree-loadable source: the grammar has one file-source
+  node (`from-parquet`), and a `.csv` path fails in the parquet reader
+  with that reader's own error. Both engines read CSV natively, so the
+  escape fragments reach it - `read_csv` on duckdb and the CSV
+  reader on rayforce - but those queries run on one engine each, never
+  on both.
 
 ## Measured cost
 
