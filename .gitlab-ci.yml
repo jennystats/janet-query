@@ -10,3 +10,9 @@ include:
       module_name: "query"
       janet_setup: "libs/install-engines.sh"
       native_needs: "duckdb rayforce"
+      # The janet-pm leg collides by design: this package declares
+      # dependencies, so the gate installs them (each carrying the
+      # jennystats/ namespace) before janet-pm runs, and janet-pm cannot
+      # install over an existing namespace directory (recorded upstream
+      # defect). The jpm leg is the install verification.
+      pm_expected_red: true
