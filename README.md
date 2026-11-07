@@ -254,6 +254,46 @@ changes/fix-cr-execution-path-outcome.md.)
   dplyr and data.table numbers from the same comparison run; those
   route scripts are not shipped - they need toolchains beyond Janet.
 
+## Which engine?
+
+janet-query's two backends are different tools. Pick by data and
+workload - and by preference, within what the data allows.
+
+**DuckDB (janet-duckdb)** - the analytical default:
+
+- Your data lives in parquet or CSV files, or in a `.duckdb` /
+  `.sqlite` database file. DuckDB reads all of them directly, in
+  place, with no ingest step.
+- Ad-hoc analytical queries: scans, filters, joins, group-bys over
+  tables too big to hold in memory comfortably. It spills to disk
+  under memory pressure instead of failing.
+- You want the fastest correct answer on the widest range of query
+  shapes - it leads our measured tables on cold runs at every scale
+  (see the measured-cost section below).
+
+**Rayforce (janet-rayforce)** - the low-latency specialist:
+
+- Your working set fits in RAM and is queried repeatedly - a live
+  table queried many times, not a file read once. Warm runs are its
+  territory: on our measured workload it holds sub-5 ms through 1M
+  rows, at or ahead of every other route.
+- Your data is already in a Rayforce splayed/partitioned table, or
+  you control the ingest (its parquet reader is single-threaded and
+  decode-bound; cold reads of large files are the one place the
+  layer cannot help).
+- You want a k/v-and-vector engine with a graph surface under the
+  same process - the binding exposes the engine's DAG, not a
+  subprocess.
+- Size matters: DuckDB's engine is a 67 MB shared library; Rayforce's
+  is 4.4 MB. For embedded use - one binary, small footprint, nothing
+  to deploy alongside - Rayforce is the lighter dependency, and its
+  deterministic single-binary build makes the footprint the whole
+  cost.
+
+**Either way**: the node tree, the refusal grammar and the error
+contract are identical - switching is one keyword, and the
+output-equivalence gate holds across both (verified per release).
+
 ## Alternatives
 
 - **[doozer](https://git.sr.ht/~subsetpark/doozer)** - composable SQL
