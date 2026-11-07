@@ -1,0 +1,45 @@
+cell parquet/duckdb                               PASS want=serves got=@{:kind :serves :value 3}
+cell parquet/rayforce                             PASS want=serves got=@{:kind :serves :value 3}
+cell csv/duckdb                                   PASS want=denies got=@{:kind :denies :value "duckdb: IO Error: No files found that match the pattern \"/tmp/does-not-exist.csv\"\n\nLINE 1: SELECT * FROM read_parquet(?::VARCHAR)\n                      ^"}
+cell csv/rayforce                                 PASS want=denies got=@{:kind :denies :value "rayforce: parquet open failed: io: parquet: cannot map /tmp/does-not-exist.csv"}
+v csv-duckdb-outcome "duckdb: IO Error: No files found that match the pattern \"/tmp/does-not-exist.csv\"\n\nLINE 1: SELECT * FROM read_parquet(?::VARCHAR)\n                      ^"
+v csv-rayforce-outcome "rayforce: parquet open failed: io: parquet: cannot map /tmp/does-not-exist.csv"
+cell composition-stack/duckdb                     PASS want=serves got=@{:kind :serves :value 5}
+cell composition-stack/rayforce                   PASS want=serves got=@{:kind :serves :value 5}
+cell distinct-numeric/duckdb                      PASS want=serves got=@{:kind :serves :value 60}
+cell distinct-numeric/rayforce                    PASS want=serves got=@{:kind :serves :value 60}
+cell distinct-str/rayforce                        PASS want=malformed-tree/rayforce-str-boundary got=@{:kind :denies :value {:backend :rayforce :error :malformed-tree :node {:input {:cols (:country) :input {:node :from-parquet :path "../test/fixtures/chinook/chinook.parquet"} :node :select} :node :distinct} :why :rayforce-str-boundary}}
+cell join-raw-str-sides/duckdb                    PASS want=serves got=@{:kind :serves :value 0}
+cell join-raw-str-sides/rayforce                  PASS want=malformed-tree/rayforce-str-join-rename got=@{:kind :denies :value {:backend :rayforce :error :malformed-tree :node {:left {:alias :i :node :from-parquet :path "../test/fixtures/chinook/chinook.parquet"} :lkeys (:reports_to) :node :join :right {:alias :m :node :from-parquet :path "../test/fixtures/chinook/chinook.parquet"} :rkeys (:employeeid) :type :inner} :why :rayforce-str-join-rename}}
+cell join-inner/duckdb                            PASS want=serves got=@{:kind :serves :value 0}
+cell join-inner/rayforce                          PASS want=serves got=@{:kind :serves :value 0}
+cell join-left/duckdb                             PASS want=serves got=@{:kind :serves :value 5}
+cell join-left/rayforce                           PASS want=serves got=@{:kind :serves :value 5}
+cell join-full/duckdb                             PASS want=serves got=@{:kind :serves :value 5}
+cell join-full/rayforce                           PASS want=serves got=@{:kind :serves :value 5}
+cell join-anti/duckdb                             PASS want=serves got=@{:kind :serves :value 1980}
+cell join-anti/rayforce                           PASS want=extension-denied/* got=@{:kind :denies :value {:backend :rayforce :error :extension-denied :operator :join-anti}}
+cell group-aggregate-9/duckdb                     PASS want=serves got=@{:kind :serves :value 60}
+cell group-aggregate-9/rayforce                   PASS want=serves got=@{:kind :serves :value 60}
+cell count-distinct/duckdb                        PASS want=serves got=@{:kind :serves :value 60}
+cell count-distinct/rayforce                      PASS want=extension-denied/* got=@{:kind :denies :value {:backend :rayforce :error :extension-denied :operator :count-distinct}}
+cell median/duckdb                                PASS want=serves got=@{:kind :serves :value 60}
+cell median/rayforce                              PASS want=extension-denied/* got=@{:kind :denies :value {:backend :rayforce :error :extension-denied :operator :median}}
+cell keyless-group/duckdb                         PASS want=serves got=@{:kind :serves :value 1}
+cell keyless-group/rayforce                       PASS want=malformed-tree/rayforce-no-keys-group got=@{:kind :denies :value {:backend :rayforce :error :malformed-tree :node {:aggs ({:agg :count :arg {:col :invoiceid :expr :get} :expr :agg} {:agg :sum :arg {:col :total :expr :get} :expr :agg}) :input {:node :from-parquet :path "../test/fixtures/chinook/chinook.parquet"} :keys () :node :group} :why :rayforce-no-keys-group}}
+cell append/duckdb                                PASS want=serves got=@{:kind :serves :value 4}
+cell append/rayforce                              PASS want=extension-denied/* got=@{:kind :denies :value {:backend :rayforce :error :extension-denied :operator :append}}
+cell write-parquet/duckdb                         PASS want=serves got=@{:kind :serves :value @[(1980)]}
+cell write-parquet/rayforce                       PASS want=extension-denied/* got=@{:kind :denies :value {:backend :rayforce :error :extension-denied :operator :write-parquet}}
+cell str-group/rayforce                           PASS want=serves got=@{:kind :serves :value 12}
+cell str-order-after-group/rayforce               PASS want=malformed-tree/rayforce-str-boundary got=@{:kind :denies :value {:backend :rayforce :error :malformed-tree :node {:input {:aggs ({:agg :count :arg {:col :invoiceid :expr :get} :expr :agg}) :input {:node :from-parquet :path "../test/fixtures/chinook/chinook.parquet"} :keys (:country) :node :group} :keys ({:col :country :dir :asc}) :node :order} :why :rayforce-str-boundary}}
+cell str-join-rename/rayforce                     PASS want=malformed-tree/rayforce-str-join-rename got=@{:kind :denies :value {:backend :rayforce :error :malformed-tree :node {:left {:alias :i :node :from-parquet :path "../test/fixtures/chinook/chinook.parquet"} :lkeys (:reports_to) :node :join :right {:alias :m :node :from-parquet :path "../test/fixtures/chinook/chinook.parquet"} :rkeys (:employeeid) :type :inner} :why :rayforce-str-join-rename}}
+cell d2-cross-backend-handles                     PASS want=denies got=@{:kind :denies :value {:backends (:duckdb :rayforce) :error :malformed-tree :node {:node :from :src @{:backend :rayforce :h 2}} :why :cross-backend-handles}}
+cell d2-cross-backend-class                       PASS want=malformed-tree/cross-backend-handles got=@{:kind :denies :value {:backends (:duckdb :rayforce) :error :malformed-tree :node {:node :from :src @{:backend :rayforce :h 2}} :why :cross-backend-handles}}
+cell catalog/known-column-duckdb                  PASS want=serves got=@{:kind :serves :value 1980}
+cell catalog/unknown-column-duckdb                PASS want=unknown-column/* got=@{:kind :denies :value {:error :unknown-column :name :zzz}}
+cell catalog/unknown-column-rayforce              PASS want=unknown-column/* got=@{:kind :denies :value {:error :unknown-column :name :zzz}}
+v narrowed-c-plain (:total)
+cell narrowed-c-plain-serves                      PASS want=serves got=@{:kind :serves :value (:total)}
+cell narrowed-c-where-unlisted                    PASS want=unknown-column/* got=@{:kind :denies :value {:error :unknown-column :name :zzz}}
+RESULT: pass passed=41 failed=0

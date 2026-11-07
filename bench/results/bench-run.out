@@ -1,0 +1,61 @@
+running duckdb-sql   cold+warm x5
+running jq-duckdb    cold+warm x5
+running jq-rayforce  cold+warm x5
+running pandas       cold+warm x5
+running polars       cold+warm x5
+running dplyr        cold+warm x5
+running data.table   cold+warm x5
+
+== cold (ms, min of 5) ==
+query duckdb-sql  jq-duckdb   jq-rayforce pandas      polars      dplyr       data.table  
+q1    5.3         8.9         796.0       11.3        12.8        39.0        41.0        
+q2    1.5         4.6         814.7       12.5        8.0         43.0        47.0        
+q3    4.4         11.0        2021.9      17.0        10.1        50.0        48.0        
+q4    3.8         10.9        2255.1      16.7        11.2        54.0        56.0        
+q5    2.0         5.3         841.6       17.4        8.8         39.0        44.0        
+
+== cold ratio vs fastest ==
+query duckdb-sql  jq-duckdb   jq-rayforce pandas      polars      dplyr       data.table  
+q1    1.00        1.66        149.09      2.11        2.39        7.30        7.68        
+q2    1.00        2.98        529.05      8.10        5.22        27.92       30.52       
+q3    1.00        2.50        458.79      3.87        2.29        11.35       10.89       
+q4    1.00        2.91        600.24      4.46        2.97        14.37       14.91       
+q5    1.00        2.65        419.96      8.67        4.40        19.46       21.96       
+
+== warm (ms, min of 5) ==
+query duckdb-sql  jq-duckdb   jq-rayforce pandas      polars      dplyr       data.table  
+q1    2.9         6.2         868.5       2.5         1.5         6.0         3.0         
+q2    1.3         3.6         798.7       3.5         2.1         8.0         6.0         
+q3    4.0         8.5         2127.4      8.6         3.5         15.0        15.0        
+q4    3.2         7.8         2167.5      8.7         3.6         17.0        11.0        
+q5    1.8         4.5         881.8       6.8         2.4         7.0         4.0         
+
+== warm ratio vs fastest ==
+query duckdb-sql  jq-duckdb   jq-rayforce pandas      polars      dplyr       data.table  
+q1    1.98        4.16        584.84      1.68        1.00        4.04        2.02        
+q2    1.00        2.87        638.45      2.83        1.65        6.39        4.80        
+q3    1.13        2.41        599.93      2.41        1.00        4.23        4.23        
+q4    1.00        2.45        682.24      2.74        1.13        5.35        3.46        
+q5    1.00        2.54        498.47      3.86        1.33        3.96        2.26        
+
+== route versions ==
+duckdb-sql   janet-duckdb v1.5.6
+jq-duckdb    janet-query duckdb-1.5.6
+jq-rayforce  janet-query rayforce-3.0.1
+pandas       pandas 3.1.1
+polars       polars 2.1.0
+dplyr        dplyr 1.2.1
+data.table   data.table 1.18.6.1
+
+== rows per query ==
+q1  50
+q2  10
+q3  3
+q4  60
+q5  8
+
+machine: x86_64 / 4 / model name	: Intel Core Processor (Haswell, no TSX, IBRS)
+date: 2026-11-07T01:17:10Z
+data: 65536 rows, sha256 2ef33afa8127b9fae96d94dbb502fbfadb0a20a4d48fc5ced8cb19c8a8b2cfee
+
+VERDICT: PASS - every route matched the raw-SQL row sets

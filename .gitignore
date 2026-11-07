@@ -1,0 +1,5 @@
+scope.md
+.build.duckdb
+.duckdb.log
+bundle/
+_build/

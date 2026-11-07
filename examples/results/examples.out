@@ -1,0 +1,47 @@
+===== basic-select-filter.janet =====
+duckdb columns=@[:invoiceid :total]
+  (373 400.99)
+  (901 400.99)
+  (1061 400.99)
+  (1397 400.99)
+  (1413 400.99)
+rayforce columns=@[:invoiceid :total]
+  (373 400.99)
+  (901 400.99)
+  (1061 400.99)
+  (1397 400.99)
+  (1413 400.99)
+===== composition.janet =====
+duckdb @[(1) (2) (3) (4) (5)]
+rayforce @[(1) (2) (3) (4) (5)]
+===== joins.janet =====
+duckdb @[(2 1980)]
+rayforce @[(2 1980)]
+===== group-aggregate.janet =====
+duckdb @[(8 8047.66999999999) (9 7896.67) (54 7865.66999999999)]
+rayforce @[(8 8047.66999999999) (9 7896.67) (54 7865.66999999999)]
+===== loading-parquet-csv.janet =====
+duckdb parquet @[(1) (2) (3)]
+rayforce parquet @[(1) (2) (3)]
+duckdb csv refused: duckdb: IO Error: No files found that match the pattern "chinook.csv"
+
+LINE 1: SELECT * FROM (SELECT "invoiceid" FROM (SELECT * FROM read_parquet(?::VARCHAR)) AS "q1") AS "q0" LIMIT ?::BIGINT
+                                                              ^
+rayforce csv refused: rayforce: parquet open failed: io: parquet: cannot map chinook.csv
+===== catalogued-sources.janet =====
+duckdb known @[(1 332.99) (2 367.99)]
+duckdb unknown refused: {:error :unknown-column :name :region}
+rayforce known @[(1 332.99) (2 367.99)]
+rayforce unknown refused: {:error :unknown-column :name :region}
+===== errors.janet =====
+unknown node: {:backend :duckdb :error :extension-denied :operator :pivot}
+count-distinct on rayforce: {:backend :rayforce :error :extension-denied :operator :count-distinct}
+mixed handles: {:backends (:duckdb :rayforce) :error :malformed-tree :node {:node :from :src @{:backend :rayforce :handle 2}} :why :cross-backend-handles}
+===== admission.janet =====
+plain select columns: (:total)
+plain select execute: @[(332.99) (367.99)]
+where on an unlisted column: {:error :unknown-column :name :zzz}
+===== raw-sql-vs-tree.janet =====
+raw SQL: @[(8 8047.66999999999) (9 7896.67) (54 7865.66999999999)]
+tree:    @[(8 8047.66999999999) (9 7896.67) (54 7865.66999999999)]
+identical: true
