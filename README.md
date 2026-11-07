@@ -164,8 +164,7 @@ rayforce surface additionally refuses VARCHAR beyond terminal positions
   benchmark's q4 runs.
 - Order keys stay outside the catalogue name check (a known gap; a
   regression cell fails if a future change starts checking them silently).
-- Group keys are name-checked at expansion - stricter than the original
-  contract text.
+- Group keys are name-checked at expansion.
 - A non-sequence `:columns` catalogue value (a string or keyword) iterates
   as bytes and describes a byte list; an integer raises the raw host error.
 - The exclusions register - union order, empty `:columns`, from-source
