@@ -926,8 +926,9 @@ catalog entry (a source the catalog does not name defers to the engine
 
 # FIELDLESS IS A VALUE TEST. An entry is fieldless exactly when
 # its writer value is not ONE record name - absent, empty, a list, a number or
-# a name resolving to none. A fieldless entry carries no testimony, so item 3
-# never reaches it and it keeps the 03fc1ec walk exactly. Identity never
+# a name resolving to none. A fieldless entry carries no testimony, so the
+# identity-scoped admission never reaches it and it keeps the base
+# `usable?` walk exactly. Identity never
 # resolves unless the arm itself does, so an unresolved value reads fieldless.
 (defn/typed writer-fieldless? {:args [:any :any] :ret :boolean} [arm-rec entry-rec]
   (or (nil? arm-rec) (nil? entry-rec)))
@@ -958,7 +959,7 @@ catalog entry (a source the catalog does not name defers to the engine
 # marking pass uses) carries only the binding key, so an alias-reached
 # writer-bearing entry would read a two-key catalogue as blocked. This is the
 # SAME test stated over the record's full spelling set - no subtraction, no
-# writer term (erratum C narrowed: content decides the block, not the writer).
+# writer term: the content of the column list decides the block, not the writer.
 (defn/typed colset-key {:args [:any] :ret :string}
   [cs]
   "Canonical key for a column LIST as a SET (list order and
@@ -1372,12 +1373,12 @@ An entry carrying a WRITER field (:writer) is caller
 authorship testimony and takes the identity-scoped admission instead: on a PARQUET arm it is admitted only when its
 writer resolves to this record AND it sits under one of the record's own
 spellings AND no entry under an ALIEN key carries its list. The block
-rule is CONTENT (erratum C): a list carried under an alien key silences
+rule is CONTENT: a list carried under an alien key silences
 every entry carrying that list, writer-bearing or not - the writer
 decides nothing about the block set. Entries whose writer names no
-single record are FIELDLESS (item 2, a value test) and keep the
-03fc1ec walk exactly; a pathless (from-source) arm does not consult the
-field (that lane is unmodelled)."
+single record are FIELDLESS (a value test on the writer field) and keep
+the base catalogue walk exactly; a pathless (from-source) arm does not
+consult the field (that lane is unmodelled)."
   (var ks nil)
   (def entries (catalog-entries catalog key-of k path id-map))
   # an entry's list is a SHARED BLOCK when an entry that is NOT another key
@@ -1404,7 +1405,7 @@ field (that lane is unmodelled)."
   # catalogue, which the circularity bar forbids. The writer
   # field names this record through the same identity machinery, in any
   # spelling (path or alias); a writer naming no single record is FIELDLESS
-  # (item 2), not foreign. Without an identity map or an arm record, identity
+  # (a value test on the writer field), not foreign. Without an identity map or an arm record, identity
   # scoping is undecidable and a carrying entry contributes nothing - absence
   # of testimony is not a foreign claim, but it is not an own one either.
   (def arm-rec (when (dictionary? id-map) (source-of-key id-map (or path k))))
@@ -1441,14 +1442,15 @@ field (that lane is unmodelled)."
     # The three writer conditions as one letter: a writer-bearing
     # entry on a parquet arm is admitted only when (i) its writer is this
     # record, (ii) it reached the arm through one of the record's own
-    # spellings, and (iii) no alien entry carries its list. Items (ii) and
-    # (iii) are item 2's key scoping and block rule, restated (erratum B).
+    # spellings, and (iii) no alien entry carries its list. Conditions (ii)
+    # and (iii) are the key-scoping and block rules restated over the
+    # record's full spelling set.
     # (iii) is ONE condition for every entry: the list must be absent from
     # the alien-key set. `usable?` answers it over the
     # binding key; `record-blocked?` is the same test over the record's whole
     # spelling set, the one the marking pass above uses.
-    # An entry whose writer names no record is FIELDLESS (item 2) and keeps
-    # the 03fc1ec usable? walk exactly.
+    # An entry whose writer names no record is FIELDLESS and keeps
+    # the base `usable?` walk exactly.
     (def standalone
       (cond
         (not cs) false
@@ -3343,8 +3345,7 @@ union."
             (unless (or (and reshaped
                              (not (nil? (find |(= (string (keyword $)) (string ck)) reshaped))))
                         (and (nil? alias) (not (all-catalogued?)))
-                        # R2 (the select passthrough): a
-                        # select that declares nothing is a pass-through and
+                        # A select that declares nothing is a pass-through and
                         # the engine decides. The ceiling above
                         # stands on the row's STORED source columns, not on
                         # the catalogue: an arm nobody described defers the

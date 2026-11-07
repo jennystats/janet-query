@@ -2031,7 +2031,8 @@ per-node-type; an escape atom inside a denied lane names that lane)")
                       {:t {:columns [:a :b]}}))
   {:error :malformed-tree :why :group-agg}
   "catalog|a-malformed-operator-refuses-tagged")
-# B3 / R3 (v0.7.3 item 3 clarification): the wrapper spellings are ONE node
+# The wrapper spellings are ONE node: the string "c" and the keyword :c
+# normalise to the same column reference.
 (assert (deep= (jq/col2 "c") (jq/col2 :c))
         "wrapper-spellings-one-node")
 (assert (deep= (jq/agg-count (jq/col2 "c")) (jq/agg-count :c))
@@ -2074,9 +2075,9 @@ per-node-type; an escape atom inside a denied lane names that lane)")
            nil
            "identity/absent|lone-block-leaves-arm-unnamed")
 # the wall, open in absent mode: a foreign entry under the arm's own
-# path spelling DESCRIBES the arm (item 6 records the refutation). A
-# FIELD-bearing entry here takes item 2's lane - its writer names no record
-# (FIELDLESS IS A VALUE TEST), so the 03fc1ec admission governs it and it
+# path spelling DESCRIBES the arm. A
+# FIELD-bearing entry here takes the fieldless lane - its writer names no record
+# (FIELDLESS IS A VALUE TEST), so the base admission governs it and it
 # describes exactly as the fieldless entry does.
 (assert-eq (get (jq/expand-tree v11-arm {"v11a.parquet" {:columns [:y :z]}}) :columns)
            [:y :z]
@@ -2085,8 +2086,8 @@ per-node-type; an escape atom inside a denied lane names that lane)")
 # -- present mode: identity-scoped admission (the three
 # conditions as one letter). The own union's member set {a b c} survives an
 # alien entry that carries a DIFFERENT list; an alien entry carrying an own
-# list still silences that claim (item 3 (iii), the block rule). "The alien
-# copy neither adds nor subtracts" is WITHDRAWN: the measured consequence is the block rule.
+# list still silences that claim (the block rule). "The alien
+# copy neither adds nor subtracts" is NOT true: the measured consequence is the block rule.
 (def v11-a "v11a.parquet")
 (def v11-own {:wa {:columns [:a :b] :writer :wa}
               v11-a {:columns [:c] :writer v11-a}})
