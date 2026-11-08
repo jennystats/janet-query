@@ -71,6 +71,27 @@
        "//   (likewise absorptionNever, presenceNeverFlips)\n//   quint verify --invariant=pbS2 GREEN STALE - withdrawn by the fixture fix")
 (check "stale-marked verdict passes" (= 0 (gate-rc d3b "")))
 
+# cell 3c: a GREEN verify verdict with NO verbatim-green record is a claim
+# without its evidence and must fail (the contract's green-claim discipline)
+(def d3c (stage (fresh-dir "green-no-record")))
+(plant d3c "scope-model.qnt" "//   (likewise absorptionNever, presenceNeverFlips)"
+       "//   (likewise absorptionNever, presenceNeverFlips)\n//   quint verify --invariant=pbS2 GREEN is the present-mode result")
+(check "green verdict with no verbatim-green record fails" (= 1 (gate-rc d3c "")))
+
+# cell 3d: a verdict stated with its verbatim-green record on the SAME line
+# passes; the queue word is left out of the planted line so the line is not
+# itself read as a command citation.
+(def d3d (stage (fresh-dir "green-record-ok")))
+(plant d3d "scope-model.qnt" "//   (likewise absorptionNever, presenceNeverFlips)"
+       "//   (likewise absorptionNever, presenceNeverFlips)\n//   present-mode pbS2Neutrality GREEN verbatim-green: clause=val pbS2Neutrality =; tree=catalogue-partb.qnt=b2136fa4; endpoint=localhost:8901; runs=5 green=5")
+(check "verbatim-green record closes the green claim" (= 0 (gate-rc d3d "")))
+
+# cell 3e: a record missing the run count fails
+(def d3e (stage (fresh-dir "green-record-incomplete")))
+(plant d3e "scope-model.qnt" "//   (likewise absorptionNever, presenceNeverFlips)"
+       "//   (likewise absorptionNever, presenceNeverFlips)\n//   present-mode pbS2Neutrality GREEN verbatim-green: clause=val pbS2Neutrality =; tree=catalogue-partb.qnt=b2136fa4; endpoint=localhost:8901")
+(check "verbatim-green record missing its run count fails" (= 1 (gate-rc d3e "")))
+
 # cell 4: the shipped tree, unmodified, must close
 (def d4 (stage (fresh-dir "shipped")))
 (check "shipped tree closes the gate" (= 0 (gate-rc d4 "")))

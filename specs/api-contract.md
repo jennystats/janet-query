@@ -985,6 +985,31 @@ shipped: `malformed` is unreachable, and the union is the only behaviour.
 Order-only disagreement - two entries carrying the same set in different
 orders - is not this rule's trigger; it compares sets.
 
+**The writer field's domain.** The field carries the CALLER'S VALUE as
+supplied, and the engine resolves it on every read; it never rewrites the
+field to a normalised form. The value domain is: any value, with one record
+name being the only testimony-bearing value. In this version the value is
+a name text, either the record's RECORD NAME (`"A"` for the record whose
+path is `pa.parquet`) or the record's VALUE ID (`"wr-A"`). Both are the
+same testimony under the same rule: a value resolves to a record only
+when it names exactly one record in the field's vocabulary, and (i) the
+writer match reads the resolved record. The model's field vocabulary is
+closed over both spellings (`ps2Names` resolves `"A"` and `"wr-A"` to
+`"A"`; the walk's own shapes write the value id, the absent-mode fixtures
+write the record name), so a model that resolves only one spelling
+certifies a narrower rule than this sentence states. The fixtures of the
+present-mode shapes (`ff-*` in `specs/catalogue-shapes.qnt`) write the
+VALUE ID the fieldless test reads, so the value test and the writer match
+inspect one value, not a value and a translation of it. WHAT "CARRIED"
+MEANS: the field carries a value from this domain, and the value alone
+decides the lane - a value that resolves to no record, or to two, is
+fieldless whatever key it sits under, and one that resolves to exactly
+one record is testimony for that record at (i). This domain paragraph is
+the letter's own meaning: it is what 12.4 (i) always said ("its writer is
+that record") read against a field whose value is caller testimony, and it
+is the reading the shipped model implements (`ps2Names`, the fieldless
+value test and the `ps2Oracle` lane split keyed on resolution).
+
 ### 12.5 The known limitations of the writer-identity surface
 
 Where no entry carries a writer field, three properties do not hold, and
@@ -1028,16 +1053,24 @@ writer carries does not make its entry admitted), never from CONTENT to
 the writer disposition.
 
 **Standing measurement caveat.** The walked model's present-mode
-`ps2Neutrality` and `absorptionNever` runs are RED on the shipped lane,
-and neither red is a contract statement. Both land on `ff-*` shapes,
-where the writer value domain of the shape fixtures and the value ids the
-fieldless test reads do not line up: `specs/catalogue-shapes.qnt` maps a
-value id (`wr-A`) to the record name (`A`) in the fixture's writer field,
-while the fieldless test reads value ids. The counterexample shape moves
-between solver runs; the class does not. Both reds are FIXTURE defects:
-they say nothing about the admissibility rule, which is certified by
-`pbS2` and not by these runs. The properties are red until the fixture is
-corrected.
+`ps2Neutrality` and `absorptionNever` runs were RED on the shipped lane
+before the shape-fixture correction described here, and neither red was
+a contract statement. Both landed on `ff-*` shapes, where the writer
+value the shapes carried and the value the fieldless test reads did not
+line up: `specs/catalogue-shapes.qnt` mapped a value id (`wr-A`) to the
+record name (`A`) in the entry's writer field, while the fieldless test
+read value ids. The counterexample shape moved between solver runs; the
+class did not. Both reds were FIXTURE defects: they said nothing about
+the admissibility rule, which is certified by `pbS2` and not by these
+runs. The correction is applied (12.4, the field's domain): the shape
+fixtures carry the value id, the walk's fieldless test no longer treats
+the empty value as a member, and the oracle's lane split is keyed on
+value resolution. The red-first cell `cmFfFixtureWritesTheValueTested`
+fails on the uncorrected fixture and passes on the corrected one.
+Corrected, neither property is green: `ps2Neutrality` stays RED, and
+`absorptionNever` stays RED under its own clause and under a second,
+identity-independent absorption instrument stated over the entry set.
+Neither is re-stated as fact.
 
 ### 12.6 The exclusions register
 
@@ -1062,6 +1095,20 @@ entries are unioned and the disagreement is not visible in the published
 column set. When the two entries carry the same names in the same order,
 that is one arm catalogued twice and is accepted. The refusal for the
 disagreeing case is not implemented and is carried as an open gap.
+
+### 12.8 The green-claim discipline
+
+No Quint green is a contract fact on its own. A sentence may state a
+property as GREEN only when the verdict line it is stated on also
+carries the record, and the record has all four of: the VERBATIM
+invariant text (the clause as it ran), the TREE HASH of every spec file
+the run read, the ENDPOINT the run used, and the RUN COUNT with the
+number of greens among the runs. A green without those four is a
+measurement, not a fact, and the contract cites it as measured status
+only. This applies to every property this chapter names, the support
+instruments included. The gate that enforces the record format is
+`specs/citation-gate.janet`; the record shape is the `verbatim-green`
+block it reads. In this version no green is stated.
 
 ## Sources
 

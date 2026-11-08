@@ -171,19 +171,17 @@ module catalogueShapes {
 
 
   // the ffCat cells' constructor: an arm entry under the alias key whose
-  // FIELD VALUE is `wv`; the entry's writer names the record the value names
-  // (empty for none). The stranger carries the same value (and so the same
-  // writer) and the same list at an alien key - item 2's block evidence.
+  // FIELD VALUE is `wv`, written into the entry's writer field as the
+  // caller supplied it. The stranger carries the same value (and so the
+  // same writer) and the same list at an alien key - item 2's block
+  // evidence.
   //
-  // KNOWN FIXTURE DEFECT: `shWrNames` writes the RECORD NAME into the
-  // entry's writer field, while the fieldless test in catalogue-record.qnt
-  // reads VALUE IDS. An `ff-*` entry therefore reads as fieldless to the
-  // test and as a record's own claim to `ownWriterUnion`, which is why the
-  // present-mode `ps2Neutrality` and `absorptionNever` runs are red on the
-  // `ff-*` shapes. The defect is in this fixture, not in the admissibility
-  // rule (certified by `pbS2` in catalogue-partb.qnt).
-  pure def shWrNames(wv: str): str =
-    if (wv == "wr-A") "A" else if (wv == "wr-B") "B" else ""
+  // The writer field carries the VALUE. `shWrNames` used to map the value
+  // id to the record name while the fieldless test reads value ids, which
+  // made an `ff-*` entry read as fieldless to the test and as a record's
+  // own claim to `ownWriterUnion`. `cmFfFixtureWritesTheValueTested`
+  // pins the corrected reading: the field carries the value tested.
+  pure def shWrNames(wv: str): str = wv
   pure def shFfEnt(role: str, wv: str): Ent =
     { eid: role, key: keyOf(role, "s"), cols: LAB, writer: shWrNames(wv) }
   pure def shFfCat(wv: str, stranger: bool): Set[Ent] =

@@ -81,7 +81,7 @@ module catalogueRecord {
   // isFieldless tests the SHIPPED values only, so a mutant that reads a
   // non-`wr-none` value as testimony cannot pass by reporting every entry
   // fieldless - the strict reading only.
-  pure def isFieldless(e: Ent): bool = e.writer.in(Set("", "wr-none", "wr-nil", "wr-false", "wr-num", "wr-tbl", "wr-unres", "wr-two"))
+  pure def isFieldless(e: Ent): bool = e.writer.in(Set("wr-none", "wr-nil", "wr-false", "wr-num", "wr-tbl", "wr-unres", "wr-two"))
   // the TESTIMONY set: the record's own testifying entries - carried either
   // as a set of witnesses (catalogue) or as a set of column lists
   pure def txEntries(cat: Set[Ent], r: str): Set[Ent] =
@@ -609,15 +609,36 @@ module catalogueRecord {
   // writer resolves to the record (NECESSARY), (a) the entry sits under
   // one of the record's own spellings, (b) no alien-key entry carries
   // its list. Absent mode keeps its refutation; the present-mode run is a
-  // support instrument, red on the `ff-*` shapes through a fixture defect.
+  // support instrument, RED after the shape-fixture correction too.
   val ps2Neutrality =
     clane != "done"
     or(cdesc == ps2Oracle(shCat(cshape, cform), csubj))
 
+  // ---- the identity-independent absorption instrument ----
+  // The absorption property above reads `ownWriterUnion`, whose record set
+  // comes from the same writer field the walk reads. This instrument does not:
+  // the clause mentions the writer field nowhere, it is stated directly over
+  // the entry set the walk described, and its shape domain is ITS OWN
+  // declaration (the shapes that carry a writer value, listed by hand) rather
+  // than a list drawn from the walk. Measured on the corrected fixture
+  // domain: RED on `ff-mixed` (a mixed-polarity pair: an own value id - one
+  // record name - and an own non-name value at A, both admitted by the
+  // fieldless lane, while the record-name claim absorbs only the id entry).
+  // It is stated as an instrument, not as a green: no sentence cites it.
+  val noWriterShapes =
+    Set("empty", "lone-block", "wall-path", "wall-alias", "cross-copy", "b-own")
+  val declarableShapes = Shapes.exclude(noWriterShapes)
+  val absorptionIsDomainHard =
+    clane != "done"
+    or(cmode != "present")
+    or(not(declarableShapes.contains(cshape)))
+    or(cdesc.forall(n => n.in(ownWriterUnion(shCat(cshape, cform), csubj))))
+
   // P-absorption (the wall, closed form; Part B restatement). Nothing outside
   // the record's own writer's claims is described (the walk's fieldless lane
   // is the absent-field hand-off; P-S2 compares that against its own
-  // statement of the same rule).
+  // statement of the same rule). RED in present mode after the
+  // shape-fixture correction (the `ff-mixed` class).
   val absorptionNever =
     clane != "done"
     or(cdesc.forall(n => n.in(ownWriterUnion(shCat(cshape, cform), csubj))))
@@ -1288,6 +1309,19 @@ module catalogueRecord {
   run catalogueCalibrationNo = {
     init
       .expect(describedOf(shCat("wall-path", "s"), "A", "absent") == Set())
+      .then(stutter)
+  }
+
+  // red-first cell: the fixture's writer field carries the VALUE the fieldless
+  // test reads. It fails on the uncorrected fixture (`shWrNames` mapped the
+  // value id to the record name) and passes on the corrected one, so a fixture
+  // that translates the value it writes is caught here.
+  run cmFfFixtureWritesTheValueTested = {
+    init
+      .expect(
+        WriterVals.forall(wv =>
+          shFfCat(wv, false).forall(e => e.writer == wv)
+          and shFfCat(wv, true).forall(e => e.writer == wv)))
       .then(stutter)
   }
 

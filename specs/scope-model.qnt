@@ -2484,20 +2484,25 @@ module janetQueryScope {
 //     state space; the consequences are enumerated by runs.
 //
 // THE PROPERTIES (invariants, checked - see the verification block at the
-// top of the file for the per-cluster commands). The present-mode reds on
-// the `ff-*` shapes are fixture defects (see catalogue-shapes.qnt: the
-// fixture's writer field carries record names while the fieldless test
-// reads value ids), so these three are SUPPORT INSTRUMENTS, not gates:
+// top of the file for the per-cluster commands). The walked model's three
+// present-mode properties are SUPPORT INSTRUMENTS, not gates. Their
+// present-mode status, measured after the shape-fixture correction (the
+// shape fixtures now carry the value the fieldless test reads; see
+// catalogue-shapes.qnt and the contract's field-domain paragraph):
 //   P-S2          ps2Neutrality: an entry whose writer is not the record
 //                 changes nothing - removing every writer-other entry
 //                 leaves the described set identical. REFUTED in absent
 //                 mode (the alien agreeing copy that subtracts an own
-//                 entry's claim).
+//                 entry's claim) and still RED in present mode after the
+//                 correction; not re-stated.
 //   P-absorption  absorptionNever: nothing outside the record's own
 //                 writer's claims is ever described. REFUTED absent (the
 //                 wall: a foreign entry under any spelling of the arm's
 //                 own keys describes the arm - the refutation trace IS the
-//                 wall proof).
+//                 wall proof). RED in present mode after the correction
+//                 (the `ff-mixed` class), and RED under a second,
+//                 identity-independent absorption instrument stated over
+//                 the entry set; not re-stated.
 //   P-presence    presenceNeverFlips: removing every entry under a key
 //                 alien to the record never changes a verdict. REFUTED in
 //                 both modes on the wide sentence: an alien entry is the
@@ -2509,13 +2514,15 @@ module janetQueryScope {
 //                 disagreeing own entries, never malformed. (Union is the
 //                 only behaviour, so there is no present-mode choice to
 //                 check and no `s1Choice` invariant.)
+// A green of any of these is cited only with the clause, tree hashes,
+// endpoint and run count the contract requires.
 //
 // STATE SPACE AND BOUNDS (the coverage statement the verify records must
 // support; nothing here is sampled):
-//   enumerated   Modes(2) x S1Choices(2) x Forms(3) x Shapes(14) x
-//                Records(2) x Names(8) = 2688 configurations; every
-//                verify below explores the full cross product of its
-//                partition at depth 3 (init, describe, stutter).
+//   enumerated   Modes(2) x Forms(3) x Shapes(27) x Records(2) x Names(8)
+//                x keys(4); every verify below explores the full cross
+//                product of its partition at depth 3 (init, describe,
+//                stutter).
 //   spellings    the s/k/y forms of A's path, A's alias, B's path and the
 //                alien key "q"; variant expansion is the ownKeys set.
 //   union shapes agreeing, disagreeing (two own entries, different sets),

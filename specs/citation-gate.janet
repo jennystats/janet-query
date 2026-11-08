@@ -229,6 +229,69 @@
 (defn/typed verify-ish? {:args [:string :string] :ret :boolean} [ctx line]
   (or (not (nil? (string/find "verify" ctx))) (not (nil? (string/find "verify" line)))))
 
+# ---- the verbatim-green record, as the contract requires it (12.8) ----
+# A GREEN stated over a bounded verify is a FACT only when its record carries
+# four parts: the VERBATIM clause, the TREE hashes, the ENDPOINT and the RUN
+# COUNT. The record is one line:
+#   verbatim-green <name>: clause=<text>; tree=<file>=<hex8>[,<file>=<hex8>];
+#   endpoint=<host:port>; runs=<n> green=<k>
+# and the clause must match a definition line in the shipped modules.
+(def green-marker "verbatim-green")
+
+(defn/typed hex8? {:args [:string] :ret :boolean} [h]
+  "a recorded hash is the first 8 hex digits of a sha256"
+  (var all (and (= (length h) 8) true))
+  (each c h
+    (unless (not (nil? (string/find (string/from-bytes c) "0123456789abcdefABCDEF")))
+      (set all false)))
+  all)
+
+(defn/typed part {:args [:string :string] :ret :string} [rec key]
+  "the = value of one field in a verbatim-green record, or nil"
+  (def kf (string key "="))
+  (def p (string/find kf rec))
+  (when p
+    (def rest (string/slice rec (+ p (length kf))))
+    (var e (length rest))
+    (each sep [";" " "]
+      (def q (string/find sep rest))
+      (when (and q (< q e)) (set e q)))
+    (string/slice rest 0 e)))
+
+(defn/typed clause-in-modules? {:args [:string :string] :ret :boolean} [clause all-src]
+  "the verbatim clause names a definition the shipped modules carry"
+  (and (not (empty? clause)) (not (nil? (string/find clause all-src)))))
+
+(defn/typed green-claim-ok? {:args [:string :string :string] :ret :any} [line ctx all-src]
+  "why a GREEN line over a bounded verify is not supported, or nil when the
+   line is not such a claim / its record carries all four parts"
+  (if (not (and (verify-ish? ctx line) (not (nil? (string/find "GREEN" line)))))
+    nil
+    (if (or (stale? ctx line)
+            (and (not (nil? (string/find "STALE" line)))
+                 (not (nil? (string/find green-marker line)))))
+      nil
+      (do
+        (def p (string/find green-marker line))
+        (if (nil? p)
+          (string "no verbatim-green record (needs clause, tree hash, endpoint, run count): " (trimz line))
+          (do
+            (def rec (string/slice line p))
+            (def clause (part rec "clause"))
+            (def tree (part rec "tree"))
+            (def endpoint (part rec "endpoint"))
+            (def runs (part rec "runs"))
+            (def green (part rec "green"))
+            (def why
+              (cond
+                (or (nil? clause) (not (clause-in-modules? clause all-src))) "clause absent or names no shipped definition"
+                (nil? tree) "tree hash absent"
+                (nil? endpoint) "endpoint absent"
+                (or (nil? runs) (nil? (scan-number runs))) "run count absent"
+                (or (nil? green) (nil? (scan-number green))) "green count absent"
+                ""))
+            (if (empty? why) nil (string why ": " (trimz line)))))))))
+
 (defn/typed run-gate {:args [:string :boolean] :ret :number} [root control]
   (var fails 0)
   (def all-src (string/join (seq [f :in qnt-files] (string (slurp-string (string root "/" f)))) "\n"))
@@ -289,7 +352,20 @@
                (or (not (nil? (string/find "GREEN" line)))
                    (not (nil? (string/find "RED" line)))))
       (++ fails)
-      (printf "  FAIL  bounded-verify verdict stated live, not marked STALE: %s" (trimz line))))
+      (printf "  FAIL  bounded-verify verdict stated live, not marked STALE: %s" (trimz line)))
+    (def why (green-claim-ok? line ctx all-src))
+    (when why
+      (++ fails)
+      (printf "  FAIL  %s" why)))
+
+  (print "===== verbatim-green records")
+  (def green-lines (filter |(not (nil? (string/find green-marker $))) header-lines-out))
+  (each line green-lines
+    (def why (green-claim-ok? line "verify" all-src))
+    (if why
+      (do (++ fails) (printf "  FAIL  verbatim-green record incomplete: %s" why))
+      (printf "  record ok: %s" (trimz line))))
+  (printf "  %d verbatim-green record(s) carried" (length green-lines))
 
   (printf "\n%s: %d failure(s)"
           (if (= fails 0) (if control "CONTROL PASSED" "CLOSED") "OPEN") fails)
