@@ -11,7 +11,7 @@
 
 (def files ["scope-model.qnt" "catalogue-record.qnt" "catalogue-shapes.qnt"
             "catalogue-partb.qnt" "intersection.qnt"
-            "citation-gate.janet" "verify.janet"])
+            "citation-gate.janet" "citation-gate-test.janet" "verify.janet"])
 
 (defn/typed stage {:args [:string] :ret :string} [dir]
   "copy the spec files a gate run needs into dir"

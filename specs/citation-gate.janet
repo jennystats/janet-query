@@ -11,13 +11,19 @@
 #   currency   - every verdict word in the header's measurement lines
 #                (GREEN / RED / pass) must belong to a citation whose text
 #                marks it STALE (or a re-run this gate performs). The gate
-#                re-runs the CHEAP pinned commands (typecheck, one floor run,
-#                the pins, intersection) and fails when one of them errors.
-#                Bounded `quint verify` runs are NOT re-run here (each starts
-#                an Apalache server, 15 s to minutes); their verdicts are
-#                checked by verify.janet, and this gate requires that a
-#                header stating such a verdict mark it STALE or leave it
-#                unstated.
+#                re-runs the CHEAP pinned commands (typecheck, the floor run,
+#                the pins, the mutant family, intersection) at the case count
+#                the header claims, and fails when one errors or reports a
+#                different count.
+#
+# BUDGET RULE (owner ruling 2026-11-08). The currency set is DEFAULT-ON and
+# capped at 5 minutes total; the five commands below fit. Any addition over
+# budget is a recorded gate amendment, never silent accretion. Long
+# bounded-verify runs (the `quint verify --invariant=...` class) are NEVER
+# currency-eligible: their currency lives in the records (verify.janet and
+# the spec header's STALE marking), not in this gate. The currency half
+# prints its elapsed time on every run, so drift against the budget is
+# visible without a stopwatch.
 #
 # Usage: janet specs/citation-gate.janet             (from specs/)
 #        janet specs/citation-gate.janet --control   (positive control: an
@@ -261,11 +267,21 @@
     (print "  FAIL  the citation scan read no names at all (a zero-existence pass is not a pass)"))
 
   (print "===== verdict currency")
+  (def t0 (os/clock))
   (def pinned-state (run-pinned))
+  (def elapsed (- (os/clock) t0))
   (each [name state] (pairs pinned-state)
     (when (not (= state "ok"))
       (++ fails)
       (printf "  FAIL  pinned re-run %s: %s (a header verdict citing it is stale)" name state)))
+  # budget visibility: the currency set is capped at 5 minutes (owner ruling
+  # 2026-11-08); an addition past it is a recorded gate amendment, never
+  # silent accretion
+  (printf "  currency half elapsed: %.1fs (budget %ds, %s)"
+          elapsed 300 (if (<= elapsed 300) "within" "OVER BUDGET"))
+  (when (> elapsed 300)
+    (++ fails)
+    (print "  FAIL  currency set is over the 300 s budget - amend the gate, do not accrete"))
   (def cs (cells header-lines-out))
   (printf "  %d verdict cell(s) read from the header" (length cs))
   (each [ctx line] cs
