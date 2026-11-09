@@ -402,6 +402,7 @@ workload - and by preference, within what the data allows.
 - You want the fastest correct answer on the widest range of query
   shapes - a DuckDB route leads every cold cell at every scale in our
   measured tables (see Measured cost, above).
+- You love ducks.
 
 **Rayforce (janet-rayforce)** - the low-latency specialist:
 
