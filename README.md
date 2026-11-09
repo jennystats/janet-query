@@ -456,7 +456,7 @@ output-equivalence gate holds across both (verified per release).
 Requirements: Janet 1.42.1, and the two native engines:
 
 ```bash
-libs/install-engines.sh   # libduckdb v1.5.6 + librayforce (engine 3.0.1), pinned and sha-verified
+libs/install-engines.sh   # libduckdb v1.5.6 + librayforce (engine 3.0.2), pinned and sha-verified
 ```
 
 Then:

@@ -1,13 +1,14 @@
 # Benchmark protocol
 
-Three Janet routes run the same five queries over one parquet file; the
+Three Janet routes run the same queries over one parquet file; the
 shipped runner measures them and gates on output equivalence before any
-timing is reported. The recorded tables in `results/bench-run.out` and
-`results/bench-run-b.out` were produced by a wider seven-route comparison
-(raw SQL, the query tree on both engines, plus pandas, polars, dplyr and
-data.table); the non-Janet route scripts are not shipped with this package -
-they carry their own toolchain requirements - and their recorded numbers are
-kept as measured context.
+timing is reported. The recorded tables in `results/bench-65k.out`,
+`results/bench-100k.out` and `results/bench-1m.out` were produced by the
+wider ten-route comparison (raw SQL, the query trees on both engines,
+Rayfall, plus pandas, polars, dplyr, data.table, DataFramesMeta.jl and
+Query.jl) at three scales; the non-Janet route scripts are not shipped
+with this package - they carry their own toolchain requirements - and
+their recorded numbers are kept as measured context.
 
 ## Data
 
