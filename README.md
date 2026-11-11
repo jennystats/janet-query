@@ -181,7 +181,7 @@ rayforce surface additionally refuses VARCHAR beyond terminal positions
 - A catalogue entry whose `:columns` value is not a sequence of column
   names misbehaves: a string or keyword value iterates by byte (the
   catalogue describes nonsense one-character columns, silently), and a
-  non-iterable value (e.g. an integer) raises janet's raw host error
+  non-iterable value (e.g. an integer) raises Janet's raw host error
   instead of a contract refusal. Column names containing digits are
   unaffected - the type of the value is what matters, not the names.
 - The exclusions register - union order, empty `:columns`, from-source
@@ -380,7 +380,7 @@ top 10.
 | q1 | warm | 5.8 | **3.0** | 1.8 | 4.9 |
 | q2 | warm | 3.3 | 1.2 | 1.3 | **1.3** |
 | q3 | warm | 7.5 | 4.5 | 4.1 | 19.3 |
-| q4 | warm | 6.2 | **3.6** | 3.6 | 11.7 |
+| q4 | warm | 6.2 | **3.6** | 3.6 | 1.4 |
 | q5 | warm | 4.2 | 3.3 | **1.2** | 1.5 |
 | q6 | warm | 43.2 | 4.8 | **4.8** | 61.5 |
 
@@ -388,25 +388,28 @@ top 10.
 
 - Cold belongs to DuckDB. A DuckDB route is fastest in every cold cell at
   65k and 100k, and in every cold cell at 1M. Polars beats the janet-query
-  rayforce route on four of six cold queries at 65k and 100k and on all six
-  at 1M.
-- Warm at 65k and 100k, Rayfall wins nine of twelve cells, from 0.2 to
-  6.5 ms. The rayforce route takes q1, q2 and q4 warm at 65k, from 0.7 to
-  2.6 ms, and q1, q2 and q4 at 100k, from 0.9 to 3.3 ms.
+  rayforce route on every cold query at 65k, on five of six at 100k (q5 is
+  faster through the tree) and on q6 alone at 1M.
+- Warm at 65k and 100k, Rayfall is fastest in all twelve cells, from 0.2 to
+  6.5 ms. The rayforce route takes q1, q2 and q4 warm at 65k, from 0.6 to
+  1.4 ms, and q1, q2 and q4 at 100k, from 0.9 to 1.7 ms.
 - Warm at 1M, the lead splits. The rayforce route takes q1 (1.8), q2 (1.3)
   and q5 (1.2). Raw DuckDB SQL takes q4 (3.6) and q6 (4.8). Rayfall takes
-  q3 (5.3).
-- On warm data, janet-query on rayforce is faster than Polars on four of
-  six queries at 65k, three of six at 100k and all six at 1M. The losses are
-  q1 and q5 at 65k (1.4 and 0.8 against 0.9 and 0.7), and q1, q3 and q5 at
-  100k (1.7, 3.8 and 0.9 against 1.4, 5.7 and 0.8).
-- On q6 the rayforce route sits within 1.4x of the raw engine cold: 23.7,
-  38.1 and 427.3 ms against 23.7, 38.1 and 427.3. The group rows stay an
-  engine segment instead of a Janet array. The 1M cold q6 cell is engine
-  decode work on both lanes, wide and identical within the rep band.
-- The layer cost on rayforce runs 0.4x to 1.4x of Rayfall warm: q1, q2 and
-  q5 are faster through the layer; q3 and q4 read 1.1x to 2.8x. Cold at 1M,
-  the layer costs 1.6x to 1.9x of Rayfall.
+  q3 (19.3).
+- On warm data, janet-query on rayforce is faster than Polars on five of
+  six queries at 65k, five of six at 100k and all six at 1M. The loss at
+  65k and 100k is q1 (1.4 and 1.7 ms against 0.9 and 1.4).
+- On q6 the rayforce route costs 2.6x, 2.3x and 8.0x the raw engine cold:
+  23.7, 38.1 and 427.3 ms against 9.0, 16.8 and 53.3. The group rows stay
+  an engine segment instead of a Janet array. The 1M cold q6 cell is engine
+  decode work on the raw-SQL lane, and the rayforce route pays decode on
+  both the table build and the query.
+- The layer cost on rayforce against Rayfall is a per-query figure, not a
+  band: warm, q1 3.5x, q2 3.0x, q3 1.4x, q4 1.6x, q5 3.5x and q6 1.6x at
+  65k; q1 3.4x, q2 4.5x, q3 1.5x, q4 1.8x, q5 2.7x and q6 1.1x at 100k. At
+  1M warm the tree is faster on five of six (q1 0.37x, q3 0.21x, q4 0.31x,
+  q5 0.8x, q6 0.08x) and level on q2 (1.0x). Cold at 1M the layer costs
+  0.05x to 1.4x of Rayfall.
 - The duckdb layer costs more: warm, the tree runs 1.0x to 2.1x raw SQL at
   1M and 1.3x to 3.0x at the smaller scales.
 - Peak memory is the whole process, read from VmHWM at exit (2026-11-09
@@ -430,15 +433,16 @@ workload - and by preference, within what the data allows.
   under memory pressure instead of failing.
 - You want the fastest correct answer on the widest range of query
   shapes - a DuckDB route leads every cold cell at every scale in our
-  measured tables, except q6 cold at 1M, where jq-duckdb leads (see
-  Measured cost, above).
+  measured tables, except the 1M cells against jq-duckdb, where the
+  jq-duckdb route leads q1, q2 and q5, duckdb-sql leads q3 and q4, and
+  jq-duckdb leads q6 (see Measured cost, above).
 - You love ducks.
 
 **Rayforce (janet-rayforce)** - the low-latency specialist:
 
 - Your working set fits in RAM and is queried repeatedly - a live
   table queried many times, not a file read once. Warm runs suit it:
-  janet-query on rayforce beats Polars on four, three and six of six
+  janet-query on rayforce beats Polars on five, five and six of six
   queries at 65k, 100k and 1M, and answers the filter, aggregate and
   full-scan queries under 5 ms at 1M rows. The high-cardinality top 10
   at 1M takes 4.8 ms warm, and the raw engine is the faster warm route
