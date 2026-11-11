@@ -6,18 +6,19 @@
 # the module's typed errors at execute).
 #
 # A TRANSLATOR, not a dialect: node tree -> janet-rayforce's published
-# DAG surface (module 0.1.2, engine v3.0.1 -
+# DAG surface (module 0.1.5 or later, engine v3.0.2 - the engine is
 # UNCHANGED by this file; no engine release rides on it). Everything
 # module-unbound is a named gap the matrix DENIES - never a silent
 # substitute.
 #
 # The staged model (the module's own shape, probe-verified):
 #   - ray_group / ray_distinct take NO input op - they run over the
-#     graph's BOUND table only. A prefix chain before them executes,
-#     decodes and re-ingests (janet-side rename to the contract column
-#     names - engine agg outputs are named col_agg, the contract names
-#     are agg_col), then they run over the materialised table in a
-#     fresh graph.
+#     graph's BOUND table only. A prefix chain before them executes
+#     engine-side where the payload is all-numeric (the result table is
+#     aliased to the contract column names - engine agg outputs are named
+#     col_agg, the contract names are agg_col), then they run over the
+#     aliased table in a fresh graph; a payload carrying any other column
+#     type decodes and re-ingests janet-side first.
 #   - filter/select/sort/head/tail compose engine-side in one graph:
 #     their column arguments resolve BY NAME against the input table
 #     (probe-verified: select/sort after filter project the filtered
@@ -32,9 +33,12 @@
 #   - Fresh-graph rule: a FRESH graph per segment execution; no graph, op or
 #     table is reused across execute calls. Group keys are
 #     column ops only (a table-node key folds to a length-1 answer
-#     engine-side - never emitted).
+#     engine-side - never emitted). The in-memory F64 join zero-row
+#     observation did not reproduce (correct 2-row result, twice) -
+#     fixture artifact, not a module behaviour.
 #
-# The two alignment fences (the blocking scope): every column reference in a where predicate (fence 1,
+# The two alignment fences (the blocking scope, enforced before any
+# engine call): every column reference in a where predicate (fence 1,
 # :filter-pred-row-scope) and in a group key/agg input (fence 2,
 # :group-agg-row-scope) must resolve against the current output scope -
 # a reference outside it raises the malformed-tree class BEFORE any
@@ -45,41 +49,47 @@
 # at execute, after plan-build - the backend fence moves it to
 # translation, in the contract class.)
 #
-# Ownership: every graph, intermediate table
-# and result the backend creates is closed on its path (measured net 0
-# per translate-execute-decode cycle under
-# ray_mem_trace); user-supplied table handles are borrowed, never
-# closed. STR decode copies values into janet
-# strings (the empty-text -> nil divergence is documented). Re-ingest
-# after a segment boundary is numeric-only (the module's deferred STR
-# fence): a boundary whose payload carries STR columns and is followed
-# by more chain raises :rayforce-str-boundary naming the node. Terminal
-# groups decode STR keys/aggs directly (count/first/last/min/max are
-# type-agnostic).
+# Ownership: every graph, intermediate table and result the backend
+# creates is closed on its path (net 0 per translate-execute-decode cycle,
+# measured under ray_mem_trace); user-supplied
+# table handles are borrowed, never closed. STR decode copies values into
+# janet strings (the empty-text -> nil divergence is documented).
+# Re-ingest after a segment boundary is numeric-only (the module's
+# deferred STR fence): a boundary whose payload carries STR columns and
+# is followed by more chain raises :rayforce-str-boundary naming the
+# node. Terminal groups decode STR keys/aggs directly (count/first/last/
+# min/max are type-agnostic). Boundary crossings, join sides and group
+# results run ENGINE-SIDE where the payload is all-numeric: the executed
+# table is aliased to its contract names (rf/-table-alias) instead of
+# being decoded and re-ingested, so the values never leave the engine.
+# A group result with a numeric payload is handed back as a SEGMENT for
+# that reason, so a following order/limit composes engine-side over the
+# aliased table (the high-cardinality top-K shape: an n-group result is
+# sorted and cut in the engine and only the terminal rows are decoded).
+# The decode path still runs for any non-numeric column type, and that
+# is where the STR/SYM fences live.
 #
 # v1 from-node binding set: a parquet path (from-parquet: flat
-# null-free PLAIN I64/F64/STR, single batch preferred; multi-batch
-# merges janet-side - STR multi-batch raises the deferred class), an
+# null-free PLAIN I64/F64/STR; multi-batch files merge engine-side
+# through the binding's batch concat, every reader type carried), an
 # in-janet dataset (src @{:backend :rayforce :columns @[@[name col]
 # ...]} ordered pairs, or a struct plus an :order array), or a module
-# table handle (src @{:backend :rayforce :handle tbl}; column order
-# is not recoverable through the public surface - sorted names,
-# documented). Catalog-named SQL tables are NOT bindable on rayforce
-# (no named-table registry in the module surface).
+# table handle (src @{:backend :rayforce :handle tbl}; column order is
+# not publicly readable through the module - sorted names, documented,
+# unless a select defines the order). Catalog-named SQL tables are NOT
+# bindable on rayforce (no named-table registry in the module surface).
 #
 # Documented divergences (matrix notes): where is two-valued
 # (nulls compare as negative infinity - a null row is KEPT by lt/le/ne
 # at any threshold, probe-verified); join keys match null-to-null
-# (null-matching keys); idiv/mod floor; order puts nulls first on desc keys
-# (matching the duckdb DESC NULLS FIRST convention; ASC nulls-last on
-# both engines); implicit (from-only) projection surfaces columns in
-# sorted-name order (the engine's column order is not publicly
-# readable; an explicit select defines the order); NaN decodes as nil
-# (the unified mapping).
+# (null-matching keys); idiv/mod floor; order puts nulls first on desc
+# keys (matching the duckdb DESC NULLS FIRST convention; ASC nulls-last
+# on both engines); implicit (from-only) projection surfaces columns in
+# sorted-name order (an explicit select defines the order); NaN decodes
+# as nil (the unified mapping).
 #
 # Public API: the registration rides on import (jennystats/query
 # register-backend! :rayforce).
-
 (import jennystats/typed :prefix "")
 (import jennystats/query :prefix "jq/")
 (import jennystats/rayforce :as rf)
@@ -115,13 +125,21 @@ order)."
     (jq/err :malformed-tree
             {:why :rayforce-dataset-shape :node src :backend :rayforce})))
 
+(defn/typed -names-of {:args [:any] :ret :array}
+  [tbl]
+  "Column names only: no row decode (the fast name path). Sorted, the
+ documented implicit-projection order - column order is not recoverable
+ through the public surface."
+  (sorted (seq [i :range [0 (rf/table-ncols tbl)]] (rf/-column-name tbl i))))
+
 (defn/typed source-table {:args [:any] :ret :table}
   [tree]
   "A from/from-parquet node -> @{:tbl handle :cols [names] :owned bool}.
 from-parquet: parquet-rows (single batch owned direct; multi-batch
-merged janet-side, STR raises the module's deferred class through
-table-from-columns). from: an in-janet dataset or a borrowed module
-table handle; a name source (catalog table) is NOT bindable."
+merged engine-side by the binding's batch concat, so I64, F64 and STR
+columns all cross the batch boundary without a janet decode). from: an
+in-janet dataset or a borrowed module table handle; a name source
+(catalog table) is NOT bindable."
   (def n (get tree :node))
   (cond
     (= n :from-parquet)
@@ -131,26 +149,19 @@ table handle; a name source (catalog table) is NOT bindable."
                 {:why :rayforce-empty-parquet :node tree :backend :rayforce}))
       (if (= 1 (length batches))
         @{:tbl (batches 0) :owned true
-          :cols (sorted (map string (keys (rf/table-columns (batches 0)))))}
+          :cols (-names-of (batches 0))}
         (do
           (defer (each b batches (:close b))
-            (def names
-              (sorted (map string (keys (rf/table-columns (batches 0))))))
-            (def merged
-              (map (fn [nm]
-                     [nm (apply array
-                                ;(map (fn [b] (rf/table-column b nm)) batches))])
-                   names))
-            @{:tbl (rf/table-from-columns
-                     (table ;(mapcat (fn [p] [(p 0) (p 1)]) merged)))
-               :owned true :cols (tuple ;names)}))))
+            @{:tbl (rf/-concat-batches batches)
+              :owned true :cols (-names-of (batches 0))}))))
+
     (= n :from)
     (let [src (get tree :src)]
       (cond
         (and (or (struct? src) (table? src)) (= :rayforce (get src :backend)))
         (if (get src :handle)
           @{:tbl (get src :handle) :owned false
-            :cols (sorted (map string (keys (rf/table-columns (get src :handle)))))}
+            :cols (-names-of (get src :handle))}
           (let [pairs (resolve-dataset src)]
             @{:tbl (rf/table-from-columns
                      (table ;(mapcat (fn [p] [(p 0) (p 1)]) pairs)))
@@ -184,6 +195,7 @@ table handle; a name source (catalog table) is NOT bindable."
 
 (defn/typed new-segment {:args [:any :any :any] :ret :table}
   [tbl cols owned]
+  "A fresh segment over tbl: its graph, column scope and ownership flag."
   @{:kind :segment :tbl tbl :cols cols :out cols :scan-scope cols
     :decode-names cols
     :g (rf/graph tbl)
@@ -201,6 +213,7 @@ The state is dead afterwards."
 
 (defn/typed close-result {:args [:any] :ret :nil}
   [r]
+  "Close a result's engine table, if it carries one."
   (when (get r :res) (:close (get r :res)))
   nil)
 
@@ -223,7 +236,7 @@ a join-added side's column (the join segment tracks its added table id)."
 (defn/typed fence {:args [:any :any :any :keyword :any] :ret :table}
   [s col alias why node]
   "Resolve a column reference against the current output scope - the
-two alignment fences. Fence 1 (:filter-pred-row-scope): a where
+ two alignment fences. Fence 1 (:filter-pred-row-scope): a where
 predicate column outside the scope. Fence 2 (:group-agg-row-scope): a
 group key or agg input outside the scope. Aliased references resolve
 through the join side-map (post-join scope); an unqualified reference
@@ -327,7 +340,7 @@ through isnull)."
 
 (defn/typed decode-ordered {:args [:any :any] :ret :array}
   [tbl names]
-  "A result table's columns by tracked order (values through the A13
+  "A result table's columns by tracked order (values through the
 decode path: numbers, nil, STR strings copied out; NaN decodes as
 nil, the unified mapping)."
   (def cols (rf/table-columns tbl))
@@ -347,6 +360,7 @@ payload)."
 # exception: returns a derived value, raises the backend class; a
 # return guard would mask it
 (defn str-boundary
+  "Raise the STR boundary for a non-numeric payload node."
   [node]
   (jq/err :malformed-tree
           {:why :rayforce-str-boundary :node node :backend :rayforce}))
@@ -357,6 +371,80 @@ payload)."
   (each c cols
     (each v (if (array? c) c @[c])
       (when (or (string? v) (buffer? v)) (str-boundary node)))))
+
+# The zero-copy lanes: I64 (5) and F64 (7) are the two engine types a
+# boundary may pass through undecoded. A table whose columns are all
+# numeric is aliased by name (zero-copy); any other type takes the decode
+# path, where the STR/SYM fences live.
+(def NUMERIC-TAGS {5 true 7 true})
+
+(defn/typed -numeric-table? {:args [:any] :ret :boolean} [tbl]
+  "True when every column of tbl is an I64/F64 engine vector (no decode)."
+  (var ok true)
+  (each t (rf/-column-tags tbl)
+    (unless (get NUMERIC-TAGS t) (set ok false)))
+  ok)
+
+(defn/typed -engine-names {:args [:any] :ret :tuple} [tbl]
+  "A table's column names in engine order (names only, no decode)."
+  (tuple ;(seq [i :range [0 (rf/table-ncols tbl)]] (rf/-column-name tbl i))))
+
+(defn/typed -rename-map {:args [:any :any] :ret :table} [olds news]
+  "old name -> new name, positionally paired (the alias call maps by NAME)."
+  (def m @{})
+  (for i 0 (min (length olds) (length news))
+    (put m (olds i) (news i)))
+  m)
+
+# The zero-copy renames (group output, join sides, materialise boundary)
+# go through rf/-table-alias, which refuses duplicate OUTPUT names. The
+# engine accepts duplicate column names at the naming boundary but its two
+# read paths then disagree (table-column resolves the first, table-columns
+# keeps the last), so a colliding rename is refused in the module class
+# before the alias call rather than read back ambiguously.
+
+(defn/typed -duplicate-name {:args [:any] :ret :any} [names]
+  "The first output name that occurs more than once, or nil."
+  (var seen @{})
+  (var dup nil)
+  (each nm names
+    (when (nil? dup)
+      (if (get seen nm)
+        (set dup nm)
+        (put seen nm true))))
+  dup)
+
+(defn/typed rename-collision {:args [:any :any :any] :ret :nil}
+  [olds news node]
+  "Raises the malformed-tree class when a positional rename would map two
+engine columns onto one output name. Runs before the alias call."
+  (when-let [dup (or (-duplicate-name news) (-duplicate-name olds))]
+    (jq/err :malformed-tree
+            {:why :rayforce-duplicate-output-name :node node
+             :name dup :backend :rayforce}))
+  nil)
+
+# A rename through rf/-table-alias: the collision fence first, then the
+# module's error translation (the alias call raises for a rename map that
+# misses a name - a backend-side fault, kept as its own message).
+(defn/typed -table-alias {:args [:any :any :any :any] :ret :any}
+  [tbl olds news node]
+  "Alias tbl to news, positionally over olds. Raises the module class."
+  (rename-collision olds news node)
+  (try
+    (rf/-table-alias tbl (-rename-map olds news))
+    ([e] (jq/err :malformed-tree
+                 {:why :rayforce-table-alias
+                  :detail (if (string? e) e (string/format "%q" e))
+                  :node node :backend :rayforce}))))
+
+(defn/typed -col-tag {:args [:any :string] :ret :number} [tbl nm]
+  "The engine type tag of the named column in tbl (0 when absent)."
+  (var tag 0)
+  (def tags (rf/-column-tags tbl))
+  (for i 0 (rf/table-ncols tbl)
+    (when (= nm (rf/-column-name tbl i)) (set tag (tags i))))
+  tag)
 
 (defn/typed root-op {:args [:any] :ret :struct}
   [s]
@@ -387,6 +475,32 @@ aliased references stay resolvable after a where-after-join boundary)."
     (def fresh (new-segment (ingest names cols) names true))
     (put fresh :side-map (get s :side-map))
     fresh))
+
+(defn/typed materialize-engine {:args [:any :any] :ret :table}
+  [s node]
+  "SEGMENT -> fresh SEGMENT over its EXECUTED result table: the root op
+runs and the result is aliased to the tracked names, so the values never
+leave the engine (no decode, no re-ingest). An all-numeric result takes
+that path; any other column type falls back to the decode step, which is
+where the STR boundary and the SYM class live. Closes everything
+owned, keeps the side-map."
+  (def res (rf/execute (get s :g) (root-op s)))
+  (def names (tuple ;(get s :out)))
+  (def dnames (tuple ;(get s :decode-names)))
+  (if (and (-numeric-table? res) (deep= (-engine-names res) dnames))
+    (defer (close-segment s)
+      (def t (-table-alias res dnames names node))
+      (:close res)
+      (def fresh (new-segment t names true))
+      (put fresh :side-map (get s :side-map))
+      fresh)
+    (do
+      (def cols (decode-ordered res dnames))
+      (defer (do (close-segment s) (:close res))
+        (check-numeric-boundary cols node)
+        (def fresh (new-segment (ingest names cols) names true))
+        (put fresh :side-map (get s :side-map))
+        fresh))))
 
 (defn/typed result->segment {:args [:any :any] :ret :table}
   [r node]
@@ -484,7 +598,7 @@ surfaced under the contract name agg_col)."
       s)
     :distinct
     (let [s0 (if (or (get s :applied) (get s :op) (get s :pred))
-               (materialize s node)
+               (materialize-engine s node)
                s)
           keys (get s0 :out)]
       # distinct runs over the bound table only (no input op) - it is
@@ -495,10 +609,11 @@ surfaced under the contract name agg_col)."
       (def res (rf/execute (get s0 :g) op))
       (defer (close-segment s0)
         (def cols (decode-ordered res keys))
-        @{:kind :result :res res :cols cols :out (tuple ;keys)}))
+        @{:kind :result :res res :cols cols :out (tuple ;keys)
+          :engine-names (tuple ;keys)}))
     :group
     (let [s0 (if (or (get s :applied) (get s :op) (get s :pred))
-               (materialize s node)
+               (materialize-engine s node)
                s)]
       # the engine's ray_group requires at least one key (probe-verified
       # raise: "group: no keys") - the no-keys global-aggregate shape is
@@ -536,6 +651,19 @@ surfaced under the contract name agg_col)."
         (fence s0 (get (get a :arg) :col) (get (get a :arg) :alias)
                :group-agg-row-scope node))
       (def agg-cols (map agg-col aggs))
+      # the output names the group will carry, refused when they collide:
+      # the engine tolerates duplicate column names but its two read paths
+      # disagree on one (table-column resolves the first, table-columns
+      # keeps the last), and the numeric branch below renames onto these
+      # names, which rf/-table-alias refuses. Raised before the engine
+      # runs, so the class does not depend on the payload's column types.
+      (def out-names
+        (tuple ;key-out
+                ;(map (fn [a] (jq/expr-name a)) aggs)))
+      (when-let [dup (-duplicate-name out-names)]
+        (jq/err :malformed-tree
+                {:why :rayforce-duplicate-output-name :node node
+                 :name dup :backend :rayforce}))
       (def g (get s0 :g))
       (def op (rf/group g
                          (map (fn [nm] (scan-for s0 nm)) key-names)
@@ -553,11 +681,22 @@ surfaced under the contract name agg_col)."
                                         (get agg-engine-name
                                              (get (aggs i) :agg))))
                        (range (length aggs)))))
-        (def out-names
-          (tuple ;key-out
-                  ;(map (fn [a] (jq/expr-name a)) aggs)))
-        (def cols (decode-ordered res engine-names))
-        @{:kind :result :res res :cols cols :out out-names}))
+        # An all-numeric payload never leaves the engine: the executed
+        # table is aliased to the contract names and handed back as a
+        # SEGMENT, so a following order/limit composes engine-side in a
+        # fresh graph (the group rows are never decoded, the materialise
+        # boundary and the janet-side re-ingest both vanish). Any other
+        # column type stays on the decode path, where the STR/SYM
+        # fences live.
+        (if (and (-numeric-table? res)
+                 (deep= (-engine-names res) engine-names))
+          (defer (:close res)
+            (new-segment (-table-alias res engine-names out-names node)
+                         out-names true))
+          (do
+            (def cols (decode-ordered res engine-names))
+            @{:kind :result :res res :cols cols :out out-names
+              :engine-names engine-names}))))
     (jq/err :malformed-tree
             {:why :rayforce-node :node node :backend :rayforce})))
 
@@ -578,18 +717,41 @@ generated side name)."
 
 (defn/typed side-source {:args [:any :any] :ret :table}
   [s node]
-  "A compiled join side -> a plain source table: RESULT and applied
-  segments materialise first (join needs table handles). Returns
-  @{:tbl :cols :owned}."
+  "A compiled join side -> a plain source table. RESULT and applied
+segments execute first (join needs table handles). A side whose columns are
+all I64/F64 is ALIASED to its contract names zero-copy: names only, no
+decode, no re-ingest (the values never leave the engine). A side carrying
+any other engine type takes the decode path, which is where the numeric
+boundary fence fires. Returns @{:tbl :cols :owned}."
   (cond
     (= (get s :kind) :result)
-    (do
-      (check-numeric-boundary (get s :cols) node)
-      (def names (tuple ;(get s :out)))
-      @{:tbl (ingest names (get s :cols)) :cols names :owned true})
+    (let [names (tuple ;(get s :out))
+          res (get s :res)]
+      (if (and (-numeric-table? res)
+               (deep= (-engine-names res) (get s :engine-names)))
+        (let [t (-table-alias res (-engine-names res) names node)]
+          (:close res)
+          @{:tbl t :cols names :owned true})
+        (do
+          (check-numeric-boundary (get s :cols) node)
+          (def t (ingest names (get s :cols)))
+          (:close res)
+          @{:tbl t :cols names :owned true})))
     (or (get s :op) (get s :pred))
-    (let [m (materialize s node)]
-      @{:tbl (get m :tbl) :cols (tuple ;(get m :out)) :owned true})
+    (let [res (rf/execute (get s :g) (root-op s))
+          names (tuple ;(get s :out))
+          dnames (tuple ;(get s :decode-names))]
+      (defer (close-segment s)
+        (if (and (-numeric-table? res) (deep= (-engine-names res) dnames))
+          (let [t (-table-alias res dnames names node)]
+            (:close res)
+            @{:tbl t :cols names :owned true})
+          (do
+            (def cols (decode-ordered res dnames))
+            (check-numeric-boundary cols node)
+            (def t (ingest names cols))
+            (:close res)
+            @{:tbl t :cols names :owned true}))))
     # a join segment carries its full column set in :out (its :cols is the
     # left side's, a handle restriction of the engine join); every other
     # segment's :cols is its output
@@ -598,23 +760,40 @@ generated side name)."
 
 (defn/typed join-stage {:args [:any :any :any] :ret :table}
   [L R node]
-  "Two compiled sides -> the join SEGMENT. Collision renames (the P14
+  "Two compiled sides -> the join SEGMENT. Collision renames (the
   alias-by-renamed-copy strategy): when the sides share column names
-  (always true for a same-table self-join), both materialise as
-  alias-qualified copies - the engine collapses same-named join output
-  columns into a cross-side mix (probe-verified) and there is no
-  rename primitive, so the copies are the only naming control. STR
-  columns in a renamed copy raise the named boundary. The output is
-  always projected by the post-chain (never-surface-unprojected-join)."
+  (always true for a same-table self-join), both sides get alias-qualified
+  copies - the engine collapses same-named join output columns into a
+  cross-side mix (probe-verified) and there is no rename op, so the names
+  are the only control. A numeric side's copy is ZERO-COPY (the column
+  vectors are retained, not decoded: -table-alias); any other type takes the
+  decode path, whose STR fence is the documented :rayforce-str-join-rename
+  class. When the two key columns would mix storage types both sides take
+  the decode path, so the raw-payload rule can never fire where the
+  pre-fix shape matched by value. The output is always projected by the
+  post-chain (never-surface-unprojected-join)."
   (def La (alias-of (base-from (get node :left)) "l"))
   (def Ra (alias-of (base-from (get node :right)) "r"))
-  (def lsrc (side-source L node))
-  (def rsrc (side-source R node))
-  (def lcols (get lsrc :cols))
-  (def rcols (get rsrc :cols))
-  (def collide
-    (not (empty? (filter (fn [nm] (index-of nm rcols)) lcols))))
-  (defn renamed-copy [src alias]
+  (def lsrc0 (side-source L node))
+  (def rsrc0 (side-source R node))
+  # The join compares keys by RAW PAYLOAD: the two key columns must carry the
+  # same engine type. The zero-copy alias keeps a side's I64 columns
+  # I64, where the decode path re-ingests every column as F64 - so when a key
+  # pair would MIX types, both sides take the decode path (the pre-fix shape
+  # had them F64/F64 by construction).
+  (defn keys-mixed? [ls rs]
+    (def lks (get node :lkeys))
+    (def rks (get node :rkeys))
+    (var mixed false)
+    (for i 0 (min (length lks) (length rks))
+      (def lt (-col-tag (get ls :tbl) (string (lks i))))
+      (def rt (-col-tag (get rs :tbl) (string (rks i))))
+      (when (and (pos? lt) (pos? rt) (not= lt rt)) (set mixed true)))
+    mixed)
+  (defn decode-side [src]
+    "The decode path for one side, under the side's own names: the STR
+    fence fires on the decoded values, and the re-ingest is all-F64 as
+    before. Closes an owned source table."
     (def pairs
       (map (fn [nm] [nm (rf/table-column (get src :tbl) nm)]) (get src :cols)))
     (each [_ arr] pairs
@@ -624,8 +803,29 @@ generated side name)."
                   {:why :rayforce-str-join-rename :node node
                    :backend :rayforce}))))
     (when (get src :owned) (:close (get src :tbl)))
+    @{:tbl (ingest (get src :cols) (map last pairs))
+      :cols (get src :cols) :owned true})
+  (def mixed (keys-mixed? lsrc0 rsrc0))
+  (def lsrc (if mixed (decode-side lsrc0) lsrc0))
+  (def rsrc (if mixed (decode-side rsrc0) rsrc0))
+  (def lcols (get lsrc :cols))
+  (def rcols (get rsrc :cols))
+  (def collide
+    (not (empty? (filter (fn [nm] (index-of nm rcols)) lcols))))
+  (defn renamed-copy [src alias]
     (def names (map (fn [nm] (string alias "." nm)) (get src :cols)))
-    @{:tbl (ingest names (map last pairs)) :cols (tuple ;names) :owned true})
+    (if (-numeric-table? (get src :tbl))
+      # numeric side: alias-qualify the names, share the column vectors
+      (let [t (-table-alias (get src :tbl) (get src :cols) names node)]
+        (when (get src :owned) (:close (get src :tbl)))
+        @{:tbl t :cols (tuple ;names) :owned true})
+      # any other type takes the decode path, whose STR fence is the
+      # documented :rayforce-str-join-rename class
+      (do
+        (def d (decode-side src))
+        (def t (-table-alias (get d :tbl) (get src :cols) names node))
+        (:close (get d :tbl))
+        @{:tbl t :cols (tuple ;names) :owned true})))
   (def l* (if collide (renamed-copy lsrc La) lsrc))
   (def r* (if collide (renamed-copy rsrc Ra) rsrc))
   (def lkey-names
@@ -807,11 +1007,12 @@ documented divergence from duckdb's NaN-distinct payload)."
 (defn/typed exec-form {:args [:any] :ret :table}
   [form]
   "Engine form -> the one result wrapper. Builds every graph fresh
-inside the call, closes every backend-owned handle on its path
-(measured net 0), decodes through the STR-copy path. The two
-alignment fences and the scope fences raise the malformed-tree class before any
-engine call on their lanes; engine-detected misuse surfaces the
-module's typed errors (the 5.1 rayforce column)."
+ inside the call, closes every backend-owned handle on its path
+ (net 0, measured under ray_mem_trace), decodes through the STR-copy
+ path. The two alignment fences and the scope fences raise the
+ malformed-tree class before any engine call on their lanes;
+ engine-detected misuse surfaces the module's typed errors (the
+ error-class asymmetry the README documents)."
   (def s (compile-node (get form :tree)))
   (if (= (get s :kind) :result)
     (defer (close-result s)
@@ -819,7 +1020,7 @@ module's typed errors (the 5.1 rayforce column)."
     (decode-state s)))
 
 #==------------------------------------------------------------------------==#
-# Registration + the coverage manifest rows
+# Registration and the backend's compatibility matrix
 #==------------------------------------------------------------------------==#
 
 (def rayforce-matrix
@@ -833,7 +1034,15 @@ unbound), :count-distinct, :median (absent agg), :append
 (ray_lazy_append unbound), :write-parquet (no parquet write surface),
 :escape (a pre-built op handle is graph-scoped; the fresh-graph
 rule makes a static splice stale - the splice form needs a
-janet-rayforce slice), :expr-in/:expr-not-in (ray_in unbound)."
+janet-rayforce slice), :expr-in/:expr-not-in (ray_in unbound). One
+further divergence vs duckdb, named: a group whose output names
+would collide (a group key and an agg over another column resolving to
+the same name, e.g. key :sum_x with (sum (get :x)), or two aggs sharing
+a name) raises the malformed-tree class (`:why
+:rayforce-duplicate-output-name`) instead of being served; duckdb
+returns both columns. The engine's two read paths disagree on a
+duplicate name, so a serve would read back ambiguously; the refusal
+replaces a silent-wrong."
   {:from :shared :group :shared :select :shared :order :shared
    :limit :shared :distinct :shared :from-parquet :shared
    :where :native :join :native

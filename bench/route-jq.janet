@@ -20,6 +20,29 @@
 (def ONLY (if (> (length ARGS) 3) (ARGS 3) nil))
 (def P (string (dirname (realpath ((dyn *args*) 0))) "/data/chinook-scale.parquet"))
 
+(def KEYS ["invoiceid" "customerid" "invoicedate" "total" "country"
+           "employeeid" "reports_to" "lastname"])
+
+(defn env-of [tag]
+  "One line of the resolved environment: KEY=value (empty when unset)."
+  (printf "ENV %s %s" tag
+          (string/join (seq [k :in KEYS] (string k "=" (or (os/getenv k) ""))) " ")))
+
+(defn sha-of [path]
+  "sha256 of a file's bytes (absent file named as such, not guessed)."
+  (if (os/stat path)
+    (string/trim (first (string/split " " (sh-capture (string "sha256sum " (sh-quote path))))))
+    (string "MISSING:" path)))
+
+(defn peak-kb []
+  "Peak resident set size of this process, from /proc/self/status VmHWM."
+  (var kb 0)
+  (each line (string/split "\n" (string (slurp "/proc/self/status")))
+    (when (string/has-prefix? "VmHWM:" line)
+      (def parts (filter |(not (empty? $)) (string/split " " line)))
+      (set kb (scan-number (get parts 1)))))
+  kb)
+
 (def COLS [:invoiceid :customerid :invoicedate :total :country :employeeid
            :reports_to :lastname])
 
@@ -95,7 +118,15 @@
     (jq/execute tree :backend BACKEND)))
 
 (printf "ROUTE jq-%s" BACKEND)
-(printf "LIB janet-query %s" (if (= BACKEND :duckdb) "duckdb-1.5.6" "rayforce-3.0.1"))
+(printf "LIB janet-query %s"
+        (if (= BACKEND :duckdb) "duckdb-1.5.6"
+          (string "rayforce-" (string/join (map string (rf/engine-version)) "."))))
+(def HERE (dirname (realpath ((dyn *args*) 0))))
+(printf "MODULE query %s" (sha-of (string HERE "/../jennystats/query.janet")))
+(printf "MODULE query-rayforce %s"
+        (sha-of (string HERE "/../jennystats/query-rayforce.janet")))
+(printf "MODULE rayforce %s" (sha-of (string HERE "/../libs/rayforce-module.janet")))
+(env-of (if (= BACKEND :duckdb) "jq-duckdb" "jq-rayforce"))
 (flush)
 
 (def src (if (= MODE "warm") (warm-source) (jq/from-parquet P)))
@@ -112,3 +143,5 @@
       (unless first-res (set first-res res)))
     (emit-rows qid first-res)
     (flush)))
+(printf "PEAK %d" (peak-kb))
+(flush)

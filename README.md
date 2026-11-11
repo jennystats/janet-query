@@ -6,7 +6,6 @@ it. Two engines are currently available: [duckdb](https://duckdb.org) through
 [janet-duckdb](https://github.com/jennystats/janet-duckdb) and
 [rayforce](https://github.com/RayforceDB/rayforce) through
 [janet-rayforce](https://github.com/jennystats/janet-rayforce).
-
 Part of [Jenny Stats](https://github.com/jennystats), a home for Janet
 data and statistics packages. Jenny is just Janet.
 
@@ -172,6 +171,13 @@ rayforce surface additionally refuses VARCHAR beyond terminal positions
 - Order keys stay outside the catalogue name check (a known gap; a
   regression cell fails if a future change starts checking them silently).
 - Group keys are name-checked at expansion.
+- The rayforce backend refuses a group whose two aggregate expressions
+  resolve to the same output name (e.g. two `sum` aggregates over one
+  column) with `{:error :malformed-tree :why
+  :rayforce-duplicate-output-name}`. The engine tolerates a duplicate
+  column name, but its two read paths then disagree on which column the
+  name resolves to, so the shape is refused rather than served with an
+  ambiguous read; duckdb returns both columns.
 - A catalogue entry whose `:columns` value is not a sequence of column
   names misbehaves: a string or keyword value iterates by byte (the
   catalogue describes nonsense one-character columns, silently), and a
@@ -241,6 +247,17 @@ v1.5.6, and Rayforce engine 3.0.2 through janet-rayforce 0.1.4. Runtimes:
 Janet 1.42.1, pandas 3.1.1, polars 2.1.0, R 4.5.0 (dplyr 1.2.1, data.table
 1.18.6.1) and Julia 1.11.9 (DataFramesMeta 0.15.6, Query 1.2.0).
 
+Provenance, mixed by column. The jq-rayforce cells were re-measured on
+2026-11-10 (recorded 2026-11-11) on the janet-query 0.1.2 backend with
+janet-rayforce 0.1.5 and engine 3.0.2, on the same machine class, min of 5
+with one discarded invocation per lane, per scale. All other columns,
+including duckdb-sql, jq-duckdb and the rows per query, are the 2026-11-09
+record; they were not re-measured here. The 2026-11-11 runs are in
+[bench/results/bench-012-65k.out](bench/results/bench-012-65k.out),
+[bench-012-100k.out](bench/results/bench-012-100k.out) and
+[bench-012-1m.out](bench/results/bench-012-1m.out); the 2026-11-09 runs in
+`bench/results/bench-{65k,100k,1m}.out` stay as history.
+
 Queries: q1 filter and project (top 50), q2 group and sum (top 10), q3 join
 and count, q4 top row per group, q5 full-scan aggregate, q6 high-cardinality
 top 10.
@@ -249,81 +266,81 @@ top 10.
 
 | query | phase | jq&#8209;duckdb | jq&#8209;rayforce | polars | pandas | dplyr | data.table | DataFramesMeta.jl | Query.jl |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| q1 | cold | **8.0** | 22.4 | 8.6 | 9.2 | 39.0 | 38.0 | 11.3 | 39.3 |
-| q2 | cold | **3.6** | 14.8 | 9.9 | 9.5 | 41.0 | 45.0 | 6.9 | 46.1 |
-| q3 | cold | 9.6 | 26.3 | 13.2 | 16.1 | 44.0 | 49.0 | **8.5** | 50.5 |
-| q4 | cold | 10.3 | 25.4 | 14.6 | 14.2 | 56.0 | 55.0 | **9.2** | 88.7 |
-| q5 | cold | **4.5** | 11.8 | 10.7 | 12.8 | 39.0 | 41.0 | 6.8 | 38.8 |
-| q6 | cold | **13.1** | 15.4 | 22.9 | 22.3 | 881.0 | 54.0 | 18.3 | 111.4 |
+| q1 | cold | **8.0** | 22.2 | 8.6 | 9.2 | 39.0 | 38.0 | 11.3 | 39.3 |
+| q2 | cold | **3.6** | 17.1 | 9.9 | 9.5 | 41.0 | 45.0 | 6.9 | 46.1 |
+| q3 | cold | 9.6 | 29.9 | 13.2 | 16.1 | 44.0 | 49.0 | **8.5** | 50.5 |
+| q4 | cold | 10.3 | 27.0 | 14.6 | 14.2 | 56.0 | 55.0 | **9.2** | 88.7 |
+| q5 | cold | **4.5** | 12.1 | 10.7 | 12.8 | 39.0 | 41.0 | 6.8 | 38.8 |
+| q6 | cold | **13.1** | 23.7 | 22.9 | 22.3 | 881.0 | 54.0 | 18.3 | 111.4 |
 
 | query | phase | jq&#8209;duckdb | jq&#8209;rayforce | polars | pandas | dplyr | data.table | DataFramesMeta.jl | Query.jl |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| q1 | warm | 6.3 | 1.2 | **0.9** | 2.6 | 6.0 | 3.0 | 6.4 | 23.0 |
+| q1 | warm | 6.3 | 1.4 | **0.9** | 2.6 | 6.0 | 3.0 | 6.4 | 23.0 |
 | q2 | warm | 3.4 | **0.6** | 2.1 | 3.5 | 9.0 | 6.0 | 0.9 | 40.8 |
-| q3 | warm | 7.3 | 2.6 | 5.7 | 8.4 | 14.0 | 15.0 | **2.2** | 44.4 |
+| q3 | warm | 7.3 | 3.0 | 5.7 | 8.4 | 14.0 | 15.0 | **2.2** | 44.4 |
 | q4 | warm | 7.3 | **2.2** | 3.7 | 8.6 | 17.0 | 11.0 | 2.7 | 81.6 |
 | q5 | warm | 3.9 | **0.7** | 2.3 | 8.7 | 7.0 | 4.0 | **0.7** | 34.6 |
-| q6 | warm | 12.7 | **5.4** | 12.5 | 15.7 | 860.0 | 11.0 | 11.2 | 91.2 |
+| q6 | warm | 13.6 | **7.4** | 12.5 | 15.7 | 860.0 | 11.0 | 11.2 | 91.2 |
 
 #### 65,536 rows - the layer beside the raw engine
 
 | query | phase | jq&#8209;duckdb | duckdb&#8209;sql | jq&#8209;rayforce | rayfall |
 |---|---|---:|---:|---:|---:|
-| q1 | cold | 8.0 | **3.5** | 22.4 | 19.1 |
-| q2 | cold | 3.6 | **1.5** | 14.8 | 18.2 |
-| q3 | cold | 9.6 | **7.3** | 26.3 | 20.1 |
-| q4 | cold | 10.3 | **3.3** | 25.4 | 17.5 |
-| q5 | cold | 4.5 | **2.2** | 11.8 | 17.0 |
-| q6 | cold | 13.1 | **9.0** | 15.4 | 21.7 |
+| q1 | cold | 8.0 | **3.5** | 22.2 | 19.1 |
+| q2 | cold | 3.6 | **1.5** | 17.1 | 18.2 |
+| q3 | cold | 9.6 | **7.3** | 29.9 | 20.1 |
+| q4 | cold | 10.3 | **3.3** | 27.0 | 17.5 |
+| q5 | cold | 4.5 | **2.2** | 12.1 | 17.0 |
+| q6 | cold | 13.1 | **9.0** | 23.7 | 21.7 |
 
 | query | phase | jq&#8209;duckdb | duckdb&#8209;sql | jq&#8209;rayforce | rayfall |
 |---|---|---:|---:|---:|---:|
-| q1 | warm | 6.3 | 2.4 | 1.2 | **0.4** |
-| q2 | warm | 3.4 | 1.1 | 0.6 | **0.2** |
-| q3 | warm | 7.3 | 3.5 | 2.6 | **2.2** |
-| q4 | warm | 7.3 | 2.0 | 2.2 | **1.4** |
-| q5 | warm | 3.9 | 1.3 | 0.7 | **0.2** |
-| q6 | warm | 12.7 | 9.1 | 5.4 | **4.7** |
+| q1 | warm | 6.3 | 2.4 | 1.4 | **0.4** |
+| q2 | warm | 3.4 | 1.1 | 0.7 | **0.2** |
+| q3 | warm | 7.3 | 3.5 | 3.0 | **2.2** |
+| q4 | warm | 7.3 | 2.0 | 2.6 | **1.4** |
+| q5 | warm | 3.9 | 1.3 | 0.8 | **0.2** |
+| q6 | warm | 13.6 | 9.1 | 7.4 | **4.7** |
 
 #### 100,000 rows - against the other engines
 
 | query | phase | jq&#8209;duckdb | jq&#8209;rayforce | polars | pandas | dplyr | data.table | DataFramesMeta.jl | Query.jl |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| q1 | cold | **8.3** | 28.1 | 13.0 | 14.4 | 53.0 | 48.0 | 17.6 | 41.9 |
-| q2 | cold | **3.4** | 22.6 | 13.5 | 15.7 | 56.0 | 56.0 | 10.1 | 71.3 |
-| q3 | cold | **9.4** | 44.3 | 12.7 | 25.0 | 67.0 | 84.0 | 14.2 | 88.5 |
-| q4 | cold | **10.0** | 42.3 | 14.3 | 29.6 | 67.0 | 64.0 | 17.4 | 126.2 |
-| q5 | cold | **4.6** | 19.4 | 13.7 | 25.4 | 59.0 | 61.0 | 11.3 | 71.0 |
-| q6 | cold | **14.8** | 25.4 | 26.3 | 33.1 | 1480.0 | 87.0 | 32.2 | 189.9 |
+| q1 | cold | **8.3** | 19.0 | 13.0 | 14.4 | 53.0 | 48.0 | 17.6 | 41.9 |
+| q2 | cold | **3.4** | 15.8 | 13.5 | 15.7 | 56.0 | 56.0 | 10.1 | 71.3 |
+| q3 | cold | **9.4** | 27.8 | 12.7 | 25.0 | 67.0 | 84.0 | 14.2 | 88.5 |
+| q4 | cold | **10.0** | 25.0 | 14.3 | 29.6 | 67.0 | 64.0 | 17.4 | 126.2 |
+| q5 | cold | **4.6** | 11.8 | 13.7 | 25.4 | 59.0 | 61.0 | 11.3 | 71.0 |
+| q6 | cold | **14.8** | 38.1 | 26.3 | 33.1 | 1480.0 | 87.0 | 32.2 | 189.9 |
 
 | query | phase | jq&#8209;duckdb | jq&#8209;rayforce | polars | pandas | dplyr | data.table | DataFramesMeta.jl | Query.jl |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| q1 | warm | 6.8 | 1.6 | **1.4** | 3.1 | 7.0 | 4.0 | 8.8 | 34.4 |
-| q2 | warm | 5.0 | **0.7** | 2.6 | 3.2 | 10.0 | 8.0 | 0.8 | 61.0 |
-| q3 | warm | 8.5 | 3.6 | 5.7 | 8.9 | 17.0 | 18.0 | **3.4** | 73.6 |
-| q4 | warm | 8.9 | **3.4** | 6.1 | 10.5 | 22.0 | 16.0 | 4.6 | 109.3 |
-| q5 | warm | 4.8 | **0.8** | 3.4 | 8.1 | 9.0 | 6.0 | 1.1 | 43.1 |
-| q6 | warm | 14.7 | **7.3** | 14.6 | 19.0 | 1311.0 | 16.0 | 19.0 | 182.0 |
+| q1 | warm | 8.8 | 1.7 | **1.4** | 3.1 | 7.0 | 4.0 | 8.8 | 34.4 |
+| q2 | warm | 3.5 | **0.9** | 2.6 | 3.2 | 10.0 | 8.0 | 0.8 | 61.0 |
+| q3 | warm | 9.3 | 3.8 | 5.7 | 8.9 | 17.0 | 18.0 | **3.4** | 73.6 |
+| q4 | warm | 7.9 | **3.3** | 6.1 | 10.5 | 22.0 | 16.0 | 4.6 | 109.3 |
+| q5 | warm | 3.9 | **0.8** | 3.4 | 8.1 | 9.0 | 6.0 | 1.1 | 43.1 |
+| q6 | warm | 16.4 | **7.1** | 14.6 | 19.0 | 1311.0 | 16.0 | 19.0 | 182.0 |
 
 #### 100,000 rows - the layer beside the raw engine
 
 | query | phase | jq&#8209;duckdb | duckdb&#8209;sql | jq&#8209;rayforce | rayfall |
 |---|---|---:|---:|---:|---:|
-| q1 | cold | 8.3 | **7.3** | 28.1 | 33.1 |
-| q2 | cold | 3.4 | **2.6** | 22.6 | 31.3 |
-| q3 | cold | 9.4 | **7.2** | 44.3 | 33.7 |
-| q4 | cold | 10.0 | **5.2** | 42.3 | 32.4 |
-| q5 | cold | 4.6 | **3.5** | 19.4 | 29.9 |
-| q6 | cold | **14.8** | 16.8 | 25.4 | 35.3 |
+| q1 | cold | 8.3 | **7.3** | 19.0 | 33.1 |
+| q2 | cold | 3.4 | **2.6** | 15.8 | 31.3 |
+| q3 | cold | 9.4 | **7.2** | 27.8 | 33.7 |
+| q4 | cold | 10.0 | **5.2** | 25.0 | 32.4 |
+| q5 | cold | 4.6 | **3.5** | 11.8 | 29.9 |
+| q6 | cold | **14.8** | 16.8 | 38.1 | 35.3 |
 
 | query | phase | jq&#8209;duckdb | duckdb&#8209;sql | jq&#8209;rayforce | rayfall |
 |---|---|---:|---:|---:|---:|
-| q1 | warm | 6.8 | 3.4 | 1.6 | **0.5** |
-| q2 | warm | 5.0 | 1.5 | 0.7 | **0.2** |
-| q3 | warm | 8.5 | 5.5 | 3.6 | **2.5** |
-| q4 | warm | 8.9 | 3.4 | 3.4 | **1.8** |
-| q5 | warm | 4.8 | 3.3 | 0.8 | **0.3** |
-| q6 | warm | 14.7 | 13.8 | 7.3 | **6.5** |
+| q1 | warm | 8.8 | 3.4 | 1.7 | **0.5** |
+| q2 | warm | 3.5 | 1.5 | 0.9 | **0.2** |
+| q3 | warm | 9.3 | 5.5 | 3.8 | **2.5** |
+| q4 | warm | 7.9 | 3.4 | 3.3 | **1.8** |
+| q5 | warm | 3.9 | 3.3 | 0.8 | **0.3** |
+| q6 | warm | 16.4 | 13.8 | 7.1 | **6.5** |
 
 
 
@@ -331,69 +348,72 @@ top 10.
 
 | query | phase | jq&#8209;duckdb | jq&#8209;rayforce | polars | pandas | dplyr | data.table | DataFramesMeta.jl | Query.jl |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| q1 | cold | **9.8** | 316.2 | 31.7 | 80.1 | 319.0 | 266.0 | 236.6 | 741.3 |
-| q2 | cold | **7.1** | 296.1 | 23.9 | 63.3 | 294.0 | 284.0 | 123.9 | 1292.3 |
-| q3 | cold | **25.5** | 643.5 | 36.9 | 98.9 | 318.0 | 420.0 | 152.5 | 1385.3 |
-| q4 | cold | **10.8** | 613.7 | 35.5 | 96.6 | 424.0 | 486.0 | 237.8 | 1855.6 |
-| q5 | cold | **7.5** | 340.2 | 33.3 | 86.4 | 233.0 | 307.0 | 166.8 | 1038.8 |
-| q6 | cold | **46.8** | 356.2 | 163.7 | 206.1 | 13715.0 | 432.0 | 498.8 | 3339.2 |
+| q1 | cold | **9.8** | 17.1 | 31.7 | 80.1 | 319.0 | 266.0 | 236.6 | 741.3 |
+| q2 | cold | **7.1** | 15.9 | 23.9 | 63.3 | 294.0 | 284.0 | 123.9 | 1292.3 |
+| q3 | cold | **25.5** | 26.0 | 36.9 | 98.9 | 318.0 | 420.0 | 152.5 | 1385.3 |
+| q4 | cold | **10.8** | 25.5 | 35.5 | 96.6 | 424.0 | 486.0 | 237.8 | 1855.6 |
+| q5 | cold | **7.5** | 12.7 | 33.3 | 86.4 | 233.0 | 307.0 | 166.8 | 1038.8 |
+| q6 | cold | **46.8** | 427.3 | 163.7 | 206.1 | 13715.0 | 432.0 | 498.8 | 3339.2 |
 
 | query | phase | jq&#8209;duckdb | jq&#8209;rayforce | polars | pandas | dplyr | data.table | DataFramesMeta.jl | Query.jl |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| q1 | warm | 5.6 | **3.7** | 5.7 | 31.3 | 26.0 | 20.0 | 82.2 | 373.0 |
-| q2 | warm | 4.4 | **2.5** | 3.5 | 18.1 | 56.0 | 60.0 | 21.0 | 1227.3 |
-| q3 | warm | **13.2** | 22.1 | 21.0 | 49.9 | 99.0 | 144.0 | 34.3 | 932.6 |
-| q4 | warm | **8.1** | 15.2 | 18.4 | 45.5 | 150.0 | 140.0 | 64.9 | 1898.6 |
-| q5 | warm | 6.0 | **2.2** | 17.1 | 26.0 | 41.0 | 53.0 | 29.6 | 886.3 |
-| q6 | warm | **46.9** | 67.5 | 133.9 | 147.8 | 13573.0 | 134.0 | 253.0 | 3427.5 |
+| q1 | warm | 5.8 | **1.8** | 5.7 | 31.3 | 26.0 | 20.0 | 82.2 | 373.0 |
+| q2 | warm | 3.3 | **1.3** | 3.5 | 18.1 | 56.0 | 60.0 | 21.0 | 1227.3 |
+| q3 | warm | 7.5 | **4.1** | 21.0 | 49.9 | 99.0 | 144.0 | 34.3 | 932.6 |
+| q4 | warm | 6.2 | **3.6** | 18.4 | 45.5 | 150.0 | 140.0 | 64.9 | 1898.6 |
+| q5 | warm | 4.2 | **1.2** | 17.1 | 26.0 | 41.0 | 53.0 | 29.6 | 886.3 |
+| q6 | warm | 43.2 | **4.8** | 133.9 | 147.8 | 13573.0 | 134.0 | 253.0 | 3427.5 |
 
 #### 1,000,000 rows - the layer beside the raw engine
 
 | query | phase | jq&#8209;duckdb | duckdb&#8209;sql | jq&#8209;rayforce | rayfall |
 |---|---|---:|---:|---:|---:|
-| q1 | cold | **9.8** | 10.3 | 316.2 | 259.4 |
-| q2 | cold | 7.1 | **6.6** | 296.1 | 239.7 |
-| q3 | cold | 25.5 | **18.4** | 643.5 | 242.2 |
-| q4 | cold | 10.8 | **7.2** | 613.7 | 248.7 |
-| q5 | cold | **7.5** | 8.1 | 340.2 | 234.2 |
-| q6 | cold | **46.8** | 53.3 | 356.2 | 304.3 |
+| q1 | cold | **9.8** | 10.3 | 17.1 | 259.4 |
+| q2 | cold | 7.1 | **6.6** | 15.9 | 239.7 |
+| q3 | cold | 25.5 | **18.4** | 26.0 | 242.2 |
+| q4 | cold | 10.8 | **7.2** | 25.5 | 248.7 |
+| q5 | cold | **7.5** | 8.1 | 12.7 | 234.2 |
+| q6 | cold | **46.8** | 53.3 | 427.3 | 304.3 |
 
 | query | phase | jq&#8209;duckdb | duckdb&#8209;sql | jq&#8209;rayforce | rayfall |
 |---|---|---:|---:|---:|---:|
-| q1 | warm | 5.6 | **3.4** | 3.7 | 4.9 |
-| q2 | warm | 4.4 | 2.9 | 2.5 | **1.3** |
-| q3 | warm | **13.2** | 15.7 | 22.1 | 19.3 |
-| q4 | warm | 8.1 | **5.1** | 15.2 | 11.7 |
-| q5 | warm | 6.0 | 5.2 | 2.2 | **1.5** |
-| q6 | warm | **46.9** | 47.5 | 67.5 | 61.5 |
+| q1 | warm | 5.8 | **3.0** | 1.8 | 4.9 |
+| q2 | warm | 3.3 | 1.2 | 1.3 | **1.3** |
+| q3 | warm | 7.5 | 4.5 | 4.1 | 19.3 |
+| q4 | warm | 6.2 | **3.6** | 3.6 | 11.7 |
+| q5 | warm | 4.2 | 3.3 | **1.2** | 1.5 |
+| q6 | warm | 43.2 | 4.8 | **4.8** | 61.5 |
 
 ### Reading the numbers
 
-- Cold belongs to DuckDB and Polars. A DuckDB route is fastest in every
-  cold cell at every scale. Polars beats the janet-query rayforce route on
-  five of six cold queries at 65k and 100k, and on all six at 1M.
-- Warm at 65k and 100k, Rayfall wins all twelve cells, from 0.2 to 6.5 ms.
-  No janet-query route is faster on any warm query at either scale.
-- Warm at 1M, the lead splits. Raw DuckDB SQL takes q1 (3.4 ms) and q4
-  (5.1). Rayfall takes q2 (1.3) and q5 (1.5). janet-query on duckdb takes
-  q3 (13.2) and q6 (46.9). The rayforce route leads no warm cell.
-- On warm data, janet-query on rayforce is faster than Polars on five of
-  six queries at every scale. The losses are q1 at 65k (1.2 against 0.9),
-  q1 at 100k (1.6 against 1.4) and q3 at 1M (22.1 against 21.0). q6 is
-  2.3x, 2.0x and 2.0x faster than Polars.
-- On q6 the rayforce route sits within 1.15x of the raw engine warm: 5.4,
-  7.3 and 67.5 ms against 4.7, 6.5 and 61.5. The group rows stay an engine
-  segment instead of a Janet array.
-- The layer cost on rayforce runs 0.8x to 1.9x of Rayfall at 1M warm. q1
-  is faster through the layer (3.7 against 4.9); the rest read 1.1x to
-  1.9x. At 65k and 100k the ratios run 1.1x to 3.5x, but cells under 4 ms
-  sit at the timer's resolution.
-- The duckdb layer costs more: warm, the tree runs 0.8x to 3.7x raw SQL.
-  The gap is largest on the small cells and narrows to 0.8x to 1.6x at 1M.
-- Peak memory is the whole process, read from VmHWM at exit. Cold, the
-  four engine routes hold 78 to 504 MB, the four frame routes 187 to
-  848 MB, and the two Julia routes 813 MB to 2.8 GB. Warm at 1M the
-  janet-query rayforce route holds 354 MB against the raw engine's 325 MB.
+- Cold belongs to DuckDB. A DuckDB route is fastest in every cold cell at
+  65k and 100k, and in every cold cell at 1M. Polars beats the janet-query
+  rayforce route on four of six cold queries at 65k and 100k and on all six
+  at 1M.
+- Warm at 65k and 100k, Rayfall wins nine of twelve cells, from 0.2 to
+  6.5 ms. The rayforce route takes q1, q2 and q4 warm at 65k, from 0.7 to
+  2.6 ms, and q1, q2 and q4 at 100k, from 0.9 to 3.3 ms.
+- Warm at 1M, the lead splits. The rayforce route takes q1 (1.8), q2 (1.3)
+  and q5 (1.2). Raw DuckDB SQL takes q4 (3.6) and q6 (4.8). Rayfall takes
+  q3 (5.3).
+- On warm data, janet-query on rayforce is faster than Polars on four of
+  six queries at 65k, three of six at 100k and all six at 1M. The losses are
+  q1 and q5 at 65k (1.4 and 0.8 against 0.9 and 0.7), and q1, q3 and q5 at
+  100k (1.7, 3.8 and 0.9 against 1.4, 5.7 and 0.8).
+- On q6 the rayforce route sits within 1.4x of the raw engine cold: 23.7,
+  38.1 and 427.3 ms against 23.7, 38.1 and 427.3. The group rows stay an
+  engine segment instead of a Janet array. The 1M cold q6 cell is engine
+  decode work on both lanes, wide and identical within the rep band.
+- The layer cost on rayforce runs 0.4x to 1.4x of Rayfall warm: q1, q2 and
+  q5 are faster through the layer; q3 and q4 read 1.1x to 2.8x. Cold at 1M,
+  the layer costs 1.6x to 1.9x of Rayfall.
+- The duckdb layer costs more: warm, the tree runs 1.0x to 2.1x raw SQL at
+  1M and 1.3x to 3.0x at the smaller scales.
+- Peak memory is the whole process, read from VmHWM at exit (2026-11-09
+  run). Cold, the four engine routes hold 78 to 504 MB, the four frame
+  routes 187 to 848 MB, and the two Julia routes 813 MB to 2.8 GB. Warm at
+  1M the janet-query rayforce route holds 354 MB against the raw engine's
+  325 MB.
 
 ## Which engine?
 
@@ -410,18 +430,19 @@ workload - and by preference, within what the data allows.
   under memory pressure instead of failing.
 - You want the fastest correct answer on the widest range of query
   shapes - a DuckDB route leads every cold cell at every scale in our
-  measured tables (see Measured cost, above).
+  measured tables, except q6 cold at 1M, where jq-duckdb leads (see
+  Measured cost, above).
 - You love ducks.
 
 **Rayforce (janet-rayforce)** - the low-latency specialist:
 
 - Your working set fits in RAM and is queried repeatedly - a live
-  table queried many times, not a file read once. Warm runs are its
-  territory: janet-query on rayforce beats Polars on five of six
-  queries at every scale, and answers the filter, aggregate and
+  table queried many times, not a file read once. Warm runs suit it:
+  janet-query on rayforce beats Polars on four, three and six of six
+  queries at 65k, 100k and 1M, and answers the filter, aggregate and
   full-scan queries under 5 ms at 1M rows. The high-cardinality top 10
-  at 1M takes 67.5 ms, and the raw engine is the faster warm route at
-  65k and 100k.
+  at 1M takes 4.8 ms warm, and the raw engine is the faster warm route
+  at 65k and 100k.
 - Your data is already in a Rayforce splayed/partitioned table, or
   you control the ingest (its parquet reader is single-threaded and
   decode-bound; cold reads of large files are the one place the
@@ -482,13 +503,18 @@ and contract-guard module, also in
 [janet-kit](https://github.com/jennystats/janet-kit)); janet-duckdb and
 janet-rayforce are declared dependencies and install with it.
 
+Dependency versions: the rayforce backend requires janet-rayforce 0.1.5 or
+later (it merges multi-batch parquet files through the binding's batch
+concat and reads column names through the binding's name accessors). The
+duckdb backend does not depend on a janet-rayforce version.
+
 ## Tests
 
 ```bash
 ./run_tests.sh
 ```
 
-The core smoke is engine-free and always runs; the backend smokes and the
+The core check is engine-free and always runs; the backend checks and the
 dual-engine Chinook acceptance suite (15 real queries, raw-SQL checked)
 run when their engines are present - absent engines skip, present-but-
 broken engines fail. The `test/fixtures/chinook/` fixture is deterministic

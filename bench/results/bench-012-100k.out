@@ -1,0 +1,61 @@
+# bench/results/bench-012-100k.out - janet-query 0.1.2 rayforce re-measurement.
+# Produced by bench/runner.janet 5 (min of 5, one discarded invocation per lane)
+# on a regenerated 100,000-row fixture (gen-data.janet, seed 20261107).
+# Run 2 of 2; run 1 is the band check. See changes/bench-012-record.md.
+
+running duckdb-sql   cold x5
+running duckdb-sql   warm x5
+running jq-duckdb    cold x5
+running jq-duckdb    warm x5
+running jq-rayforce  cold x5
+running jq-rayforce  warm x5
+running q6 lanes cold x5
+running q6 lanes warm x5
+
+== cold (ms, min of 5) ==
+query duckdb-sql  jq-duckdb   jq-rayforce
+q1    5.4         8.5         19.0
+q2    2.1         4.0         15.8
+q3    7.9         10.1        27.8
+q4    4.1         10.1        25.0
+q5    3.2         5.1         11.8
+q6    38.1        17.9        38.1
+
+== warm (ms, min of 5) ==
+query duckdb-sql  jq-duckdb   jq-rayforce
+q1    2.7         8.8         1.7
+q2    1.9         3.5         0.9
+q3    4.7         9.3         3.8
+q4    2.8         7.9         3.3
+q5    1.7         3.9         0.8
+q6    7.1         16.4        7.1
+
+== route versions ==
+duckdb-sql   janet-duckdb v1.5.6 (DuckDB 1.5.6)
+jq-duckdb    janet-query duckdb-1.5.6
+jq-rayforce  janet-query rayforce-3.0.2 (engine 3.0.2, janet-rayforce 0.1.5)
+
+== rows per query ==
+q1  50
+q2  10
+q3  3
+q4  60
+q5  8
+q6  10
+
+== provenance ==
+stack: janet-query 0.1.2 backend (jennystats/query.janet 7caacc69,
+       jennystats/query-rayforce.janet c7b3a655), janet-rayforce 0.1.5
+       (rayforce.janet d4e270e3), engine 3.0.2, janet 1.42.1
+instruments: runner.janet 1eba23d5, route-jq.janet 5996465b,
+       route-duckdb-sql.janet c3cda803, route-q6.janet d291202f
+q6: the shipped route emits q1-q5; q6 is timed by route-q6.janet on the
+       same protocol. The duckdb-sql q6 cell is the raw-SQL lane: its q6 SQL
+       reads the file in both phases (the CTE re-reads it), so its warm cell
+       is a file-read bound, not a held-table read. The jq-duckdb q6 cell
+       reads the held table in warm.
+date: 2026-11-11T00:08:51Z
+data: 100000 rows, sha256 f3eae67ae6251d2484d4897d2bf431ddc33a085ec6f8946aa43f38afd1c201eb
+
+machine: x86_64 / 4 / model name : Intel Core Processor (Haswell, no TSX, IBRS)
+VERDICT: PASS - every route matched the raw-SQL row sets
