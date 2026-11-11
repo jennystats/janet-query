@@ -498,15 +498,16 @@ jpm install https://github.com/jennystats/janet-query
 
 or import from a checkout by putting the repository root on `$JANET_PATH`.
 All modules live under the `jennystats/` namespace: `(import
-jennystats/query)`. The package vendors `jennystats/typed` (the docstring
-and contract-guard module, also in
-[janet-kit](https://github.com/jennystats/janet-kit)); janet-duckdb and
+jennystats/query)`. janet-kit (which publishes the docstring and
+contract-guard module `jennystats/typed`), janet-duckdb and
 janet-rayforce are declared dependencies and install with it.
 
 Dependency versions: the rayforce backend requires janet-rayforce 0.1.5 or
 later (it merges multi-batch parquet files through the binding's batch
 concat and reads column names through the binding's name accessors). The
-duckdb backend does not depend on a janet-rayforce version.
+duckdb backend does not depend on a janet-rayforce version. For
+`jennystats/typed`, janet-kit 0.1.4 is the current release (the latest
+release at the time of writing).
 
 ## Tests
 
